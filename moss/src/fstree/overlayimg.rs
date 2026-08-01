@@ -150,6 +150,10 @@ impl Paths {
     }
 }
 
+pub fn is_valid_fstree(target: &Path) -> bool {
+    Paths::new(target).is_valid_fstree()
+}
+
 pub fn bring_up(installation: &Installation, target: &Path, mutability: Mutability) -> Result<(), Error> {
     // Constructs all paths
     let paths = Paths::new(target);
