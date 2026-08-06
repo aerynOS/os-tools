@@ -12,7 +12,7 @@ use std::{
 };
 
 use blsforme::{
-    CmdlineEntry, Entry, Schema,
+    Entry, Schema,
     bootloader::systemd_boot,
     os_release::{self, OsRelease},
 };
@@ -137,6 +137,7 @@ fn states_except_new(client: &Client, state: &State) -> Result<Vec<State>, db::E
         .sorted_by_key(|(_, whence)| whence.to_owned())
         .rev()
         .take(4)
+        .rev()
         .filter_map(|(id, _)| client.state_db.get(id).ok())
         .collect::<Vec<_>>();
     Ok(states)
@@ -191,7 +192,7 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
 
     // Grab the entries for the new state
     let mut all_kernels = vec![];
-    all_states.insert(0, state.clone());
+    all_states.push(state.clone());
     for state in all_states.iter() {
         let layouts = layouts_for_state(client, state)?;
         let local_kernels = kernel_files_from_state(&layouts, &kernel_pattern);
@@ -200,10 +201,11 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
     }
 
     // pipe all of our entries into blsforme
-    let mut entries = all_kernels
+    let entries = all_kernels
         .iter()
         .flat_map(|&(ref kernels, state_id)| {
             let rootref = &root;
+            let configref = &config;
             kernels.iter().filter_map(move |k| {
                 let sysroot = if state.id == state_id {
                     rootref.clone()
@@ -216,11 +218,8 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
                 }
 
                 let local_schema = os_schema_for_root(&sysroot).ok();
-                let entry = Entry::new(k)
-                    .with_cmdline(CmdlineEntry {
-                        name: "---fstx---".to_owned(),
-                        snippet: format!("moss.fstx={state_id}"),
-                    })
+                let entry = Entry::new(configref, k)
+                    .with_cmdline(format!("moss.fstx={state_id}"))
                     .with_state_id(i32::from(state_id))
                     .with_sysroot(sysroot);
 
@@ -232,12 +231,6 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
         })
         .collect::<Vec<_>>();
 
-    for entry in entries.iter_mut() {
-        if let Err(e) = entry.load_cmdline_snippets(&config) {
-            log::warn!("Failed to load cmdline snippets: {e}");
-        }
-    }
-
     // no usable entries, lets get out of here.
     if entries.is_empty() {
         return Ok(());
@@ -245,7 +238,7 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
 
     // If we can't get a manager, find, but don't bomb. Its probably a topology failure.
     let manager = match blsforme::Manager::new(&config) {
-        Ok(m) => m.with_entries(entries.into_iter()).with_bootloader_assets(booty_bits),
+        Ok(m) => m.with_entries(entries).with_bootloader_assets(booty_bits),
         Err(_) => return Ok(()),
     };
 
@@ -294,7 +287,7 @@ pub fn print_status(installation: &Installation) -> Result<(), Error> {
         }
     }
 
-    println!("Global cmdline : {:?}", manager.cmdline());
+    println!("Global cmdline : {:?}", manager.global_cmdline());
 
     Ok(())
 }
