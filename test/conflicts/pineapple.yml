@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2024 AerynOS Developers
-#
-# SPDX-License-Identifier: Zlib
-#
+# SPDX-License-Identifier: MPL-2.0
+
 name        : pineapple
 version     : "1"
 release     : 1
