@@ -82,7 +82,8 @@ fn identify_blit_strategy(installation: &Installation, blit_target: &Path) -> Bl
         return strategy;
     }
 
-    let from = installation.cache_path(".link-test");
+    // Link from & to same places that we will link during blit
+    let from = installation.assets_path("v2/.link-test");
     let to = blit_target.join(".link-test");
 
     let identify = || -> io::Result<_> {
