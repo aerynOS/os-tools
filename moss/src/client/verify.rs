@@ -23,6 +23,7 @@ use crate::{
     package, runtime, signal, state,
 };
 
+#[allow(clippy::branches_sharing_code)]
 pub fn verify(client: &Client, yes: bool, verbose: bool) -> Result<(), client::Error> {
     println!("Verifying assets");
 
@@ -328,6 +329,9 @@ pub fn verify(client: &Client, yes: bool, verbose: bool) -> Result<(), client::E
                 }
             })?;
             client.archive_state(state.id)?;
+            // Cleanup staging dir used as ephemeral blit target now that we've
+            // archived out of it
+            fs::remove_dir_all(client.installation.staging_dir())?;
         }
 
         println!(" {} state #{}", "»".green(), state.id);

@@ -181,9 +181,13 @@ pub fn blit_root(installation: &Installation, tree: &vfs::Tree<PendingFile>, bli
 
     let is_user_root = Uid::effective().is_root();
 
-    // Recreate dir
-    let _ = fs::remove_dir_all(blit_target);
-    mkdir(blit_target, Mode::from_bits_truncate(0o755))?;
+    // Ensure dir exists
+    if !blit_target.exists() {
+        mkdir(blit_target, Mode::from_bits_truncate(0o755))?;
+    }
+    // Ensure usr/ it removed since we will now be
+    // blitting it out
+    let _ = fs::remove_dir_all(blit_target.join("usr"));
 
     // Ensure umask is cleared so we get exact modes
     let old_umask = umask(Mode::empty());
