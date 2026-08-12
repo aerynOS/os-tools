@@ -28,6 +28,22 @@ impl RootIndex {
         self.get_history(ident).map(|meta| (ident, meta))
     }
 
+    /// Returns the defined `upgrade_via` history for the specified
+    /// [`Format`] if it exists, otherwise returns the latest history
+    /// version for this format.
+    pub fn upgrade_via_or_latest_history<'a>(&'a self, format: &Format) -> Option<(&'a Identifier, &'a HistoryMeta)> {
+        let upgrade_via = match format {
+            Format::V0 => self.formats.v0.upgrade_via.as_ref(),
+            Format::Legacy | Format::Unsupported(_) => None,
+        }
+        .and_then(|ident| self.resolve_version_to_history(ident));
+
+        upgrade_via.or_else(|| {
+            // History is sorted in DESC order where most recent will be listed first.
+            self.history.iter().find(|(_, meta)| meta.format == *format)
+        })
+    }
+
     fn get_history(&self, version: &Identifier) -> Option<&HistoryMeta> {
         self.history.get(version)
     }

@@ -10,6 +10,7 @@ use derive_more::{AsRef, Debug, Display, From, Into};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io;
+use tracing::warn;
 use url::Url;
 
 use config::Config;
@@ -282,22 +283,42 @@ impl RootIndexSource {
             .ok_or_else(|| ResolveHistoryIndexUriError::MissingRootIndexVersion(self.version.clone()))?;
 
         if matches!(history_meta.format, Format::Unsupported(_)) {
-            let upgrade_via_index_uri = root_index
-                .formats
-                .v0
-                .upgrade_via
-                .as_ref()
-                .map(|version| {
-                    root_index
-                        .resolve_version_to_history(version)
-                        .ok_or_else(|| ResolveHistoryIndexUriError::MissingRootIndexVersion(version.clone()))
-                })
-                .transpose()?
-                .map(|(ident, _)| self.history_index_uri(ident));
+            // TODO: We eventually want to trigger a self-upgrade flow once the targeted version
+            // moves into a newer unsupported format. For now, we simply saturate at the "upgrade_via"
+            // or latest version of the latest supported format by this moss, which should always
+            // include a moss that understands the next format.
+            //
+            // This allows the user to still sync & have a newer moss that they can sync w/ again
+            // onto the new format that their targeted version lands on.
+            //
+            // A future self-upgrade flow can be more intelligent in that it:
+            //
+            // - Only updates moss from the "upgrade_via" history
+            // - Reinvokes the newer moss to initiate the original sync
+            //
+            // This would allow moss to both self upgrade as many times as needed and then initiate
+            // the final on the actual format the targeted version exists, without the user having
+            // to run sync manually multiple times.
+            if let Some((ident, _)) = root_index.upgrade_via_or_latest_history(&Format::LATEST) {
+                warn!(
+                    root_index = %root_index_uri,
+                    requested_version = %self.version,
+                    requested_format = %history_meta.format,
+                    supported_version = %format::ScopedIdentifier::History(ident.clone()),
+                    supported_format = %Format::LATEST,
+                    "Requested repo index version is on a newer unsupported format, using latest supported version instead"
+                );
+                return Ok(ResolvedHistoryIndexUri::Supported(self.history_index_uri(ident)));
+            }
 
+            // TODO: This is the trigger for the self-upgrade path. For now, it is
+            // effectively "disabled" due to the previous expression.
+            //
+            // Once this links to a proper `self-upgrade` flow, we can remove the above
+            // expression and let this flow again.
             return Ok(ResolvedHistoryIndexUri::Unsupported {
                 root_index_uri,
-                upgrade_via_index_uri,
+                upgrade_via_index_uri: None,
                 version: self.version.clone(),
                 format: history_meta.format.clone(),
             });
