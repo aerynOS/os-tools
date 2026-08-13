@@ -72,6 +72,17 @@ impl Plugin {
         })
     }
 
+    pub fn query_prefix(&self, prefix: &str, flags: package::Flags) -> package::Sorted<Vec<package::Name>> {
+        package::Sorted::new(match self {
+            Plugin::Active(plugin) => plugin.query_prefix(prefix, flags),
+            Plugin::Cobble(plugin) => plugin.query_prefix(prefix, flags),
+            Plugin::Repository(plugin) => plugin.query_prefix(prefix, flags),
+
+            #[cfg(any(test, feature = "testing"))]
+            Plugin::Test(plugin) => plugin.query_prefix(prefix, flags),
+        })
+    }
+
     /// Returns a list of packages with matching `provider` and `flags`
     pub fn query_provider(&self, provider: &Provider, flags: package::Flags) -> package::Sorted<Vec<Package>> {
         package::Sorted::new(match self {
@@ -166,6 +177,15 @@ pub mod test {
                         || pkg.meta.summary.to_ascii_lowercase().contains(&keyword_lower)
                 })
                 .cloned()
+                .collect()
+        }
+
+        pub fn query_prefix(&self, prefix: &str, _flags: package::Flags) -> Vec<package::Name> {
+            let prefix_lower = prefix.to_ascii_lowercase();
+            self.packages
+                .iter()
+                .filter(|pkg| pkg.meta.name.as_str().to_ascii_lowercase().starts_with(&prefix_lower))
+                .map(|pkg| pkg.meta.name.clone())
                 .collect()
         }
 

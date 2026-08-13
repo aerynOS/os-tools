@@ -335,6 +335,16 @@ impl Client {
         self.registry.by_keyword(keyword, flags)
     }
 
+    /// Returns the name of all packages with names starting with the
+    /// provided prefix and match the given flags
+    pub fn search_packages_by_prefix<'a>(
+        &'a self,
+        prefix: &'a str,
+        flags: package::Flags,
+    ) -> impl Iterator<Item = package::Name> + 'a {
+        self.registry.by_prefix(prefix, flags)
+    }
+
     /// Activates the provided state and runs system triggers once applied.
     ///
     /// The current state gets archived.\
