@@ -11,9 +11,8 @@ const MAX_RESULTS: usize = 100;
 
 pub fn generate_results(client: &client::Client, flags: package::Flags, prefix: &str) -> Vec<CompletionCandidate> {
     client
-        .search_packages(prefix, flags)
-        .filter(|pkg| pkg.meta.name.as_str().starts_with(prefix))
-        .map(|pkg| pkg.meta.name.to_string())
+        .search_packages_by_prefix(prefix, flags)
+        .map(|name| name.to_string())
         .unique()
         .take(MAX_RESULTS)
         .map(CompletionCandidate::new)
