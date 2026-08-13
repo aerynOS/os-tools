@@ -4,10 +4,11 @@
 use std::{env, io, path::Path, path::PathBuf};
 
 use clap::{Arg, ArgAction, Command};
-use clap_complete::{
-    generate_to,
-    shells::{Bash, Fish, Zsh},
-};
+// use clap_complete::{
+//     generate_to,
+//     shells::{Bash, Fish, Zsh},
+// };
+use clap_complete::CompleteEnv;
 use clap_mangen::Man;
 use fs_err as fs;
 use moss::{Installation, installation};
@@ -94,14 +95,6 @@ fn command() -> Command {
                 .value_name("DIR")
                 .hide(true),
         )
-        .arg(
-            Arg::new("generate-completions")
-                .long("generate-completions")
-                .help("Generate shell completions")
-                .action(ArgAction::Set)
-                .value_name("DIR")
-                .hide(true),
-        )
         .arg_required_else_help(true)
         .subcommand(boot::command())
         .subcommand(cache::command())
@@ -147,16 +140,11 @@ fn generate_manpages(cmd: &Command, dir: &Path, prefix: Option<&str>) -> io::Res
     Ok(())
 }
 
-/// Generate shell completions
-fn generate_completions(cmd: &mut Command, dir: &Path) -> io::Result<()> {
-    generate_to(Bash, cmd, "moss", dir)?;
-    generate_to(Fish, cmd, "moss", dir)?;
-    generate_to(Zsh, cmd, "moss", dir)?;
-    Ok(())
-}
-
 /// Process all CLI arguments
 pub fn process() -> Result<(), Error> {
+    // Generate shell completions
+    CompleteEnv::with_factory(command).complete();
+
     let args = replace_aliases(env::args());
     let matches = command().get_matches_from(args);
 
@@ -175,13 +163,6 @@ pub fn process() -> Result<(), Error> {
         let dir = Path::new(dir);
         fs::create_dir_all(dir)?;
         generate_manpages(&command(), dir, None)?;
-        return Ok(());
-    }
-
-    if let Some(dir) = matches.get_one::<String>("generate-completions") {
-        let dir = Path::new(dir);
-        fs::create_dir_all(dir)?;
-        generate_completions(&mut command(), dir)?;
         return Ok(());
     }
 
