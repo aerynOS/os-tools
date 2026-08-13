@@ -9,7 +9,7 @@ use crate::{Installation, client, package};
 
 const MAX_RESULTS: usize = 100;
 
-fn generate_results(client: &client::Client, flags: package::Flags, prefix: &str) -> Vec<CompletionCandidate> {
+pub fn generate_results(client: &client::Client, flags: package::Flags, prefix: &str) -> Vec<CompletionCandidate> {
     client
         .search_packages(prefix, flags)
         .filter(|pkg| pkg.meta.name.as_str().starts_with(prefix))
