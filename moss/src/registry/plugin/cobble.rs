@@ -76,6 +76,18 @@ impl Cobble {
         })
     }
 
+    pub fn query_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::Name> {
+        if flags.available {
+            self.packages
+                .iter()
+                .filter(|(_, state)| state.meta.name.starts_with(prefix))
+                .map(|(_, state)| state.meta.name.clone())
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
     pub fn query_provider(&self, provider: &Provider, flags: package::Flags) -> Vec<Package> {
         self.query(flags, |meta| meta.providers.contains(provider))
     }
