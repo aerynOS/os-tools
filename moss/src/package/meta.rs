@@ -27,6 +27,10 @@ impl Name {
     pub fn contains(&self, text: &str) -> bool {
         self.0.contains(text)
     }
+
+    pub fn starts_with(&self, prefix: &str) -> bool {
+        self.0.starts_with(prefix)
+    }
 }
 
 /// The metadata of a [`super::Package`]

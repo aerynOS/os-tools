@@ -30,6 +30,7 @@ pub enum Filter<'a> {
     Dependency(Dependency),
     Name(package::Name),
     Keyword(&'a str),
+    Prefix(&'a str),
     All,
 }
 
@@ -76,6 +77,61 @@ impl Database {
         })
     }
 
+    pub fn package_names(&self, filter: Filter<'_>) -> Result<Vec<package::Name>, Error> {
+        self.conn.exec(|conn| {
+            let mut stmt;
+            let meta_query = match filter {
+                Filter::Id(id) => {
+                    stmt = conn.prepare("SELECT name FROM meta WHERE package = ?")?;
+                    stmt.query([id.as_str()])
+                }
+                Filter::Provider(provider) => {
+                    stmt = conn.prepare(indoc! {"
+                        SELECT m.name
+                        FROM meta m
+                        INNER JOIN meta_providers mp ON m.package = mp.package
+                        WHERE mp.provider = ?"})?;
+                    stmt.query([provider.to_string()])
+                }
+                Filter::Dependency(dependency) => {
+                    stmt = conn.prepare(indoc! {"
+                        SELECT m.name
+                        FROM meta m
+                        INNER JOIN meta_dependencies md ON m.package = md.package
+                        WHERE md.dependency = ?"})?;
+                    stmt.query([dependency.to_string()])
+                }
+                Filter::Name(name) => {
+                    stmt = conn.prepare("SELECT name FROM meta WHERE name = ?")?;
+                    stmt.query([name.to_string()])
+                }
+                Filter::Keyword(kw) => {
+                    stmt = conn.prepare(
+                        "SELECT name FROM meta WHERE name LIKE concat('%', ?1, '%') OR summary LIKE concat('%', ?1, '%')",
+                    )?;
+                    stmt.query([kw.to_owned()])
+                }
+                Filter::All => {
+                    stmt = conn.prepare("SELECT name FROM meta")?;
+                    stmt.query([])
+                }
+                Filter::Prefix(prefix) => {
+                    stmt = conn.prepare("SELECT name FROM meta WHERE name LIKE concat(?1, '%')")?;
+                    stmt.query([prefix.to_owned()])
+                }
+            }?;
+
+            let entries = meta_query
+                .mapped(|row| {
+                    let name = package::Name::from(row.get::<_, String>("name")?);
+                    Ok( name)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(entries)
+        })
+    }
+
     pub fn query(&self, filter: Filter<'_>) -> Result<Vec<(package::Id, Meta)>, Error> {
         self.conn.exec(|conn| {
             let mut stmt;
@@ -113,6 +169,10 @@ impl Database {
                 Filter::All => {
                     stmt = conn.prepare("SELECT * FROM meta")?;
                     stmt.query([])
+                }
+                Filter::Prefix(prefix) => {
+                    stmt = conn.prepare("SELECT * FROM meta WHERE name LIKE concat(?1, '%')")?;
+                    stmt.query([prefix.to_owned()])
                 }
             }?;
 

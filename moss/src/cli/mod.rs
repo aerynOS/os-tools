@@ -4,10 +4,6 @@
 use std::{env, io, path::Path, path::PathBuf};
 
 use clap::{Arg, ArgAction, Command};
-// use clap_complete::{
-//     generate_to,
-//     shells::{Bash, Fish, Zsh},
-// };
 use clap_complete::CompleteEnv;
 use clap_mangen::Man;
 use fs_err as fs;
