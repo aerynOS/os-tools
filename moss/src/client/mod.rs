@@ -72,7 +72,7 @@ pub struct ClientBuilder {
     installation: Installation,
     repositories: Option<repository::Map>,
     system_model_path: Option<PathBuf>,
-    blit_root: Option<PathBuf>,
+    ephemeral: Option<(PathBuf, fstree::Format)>,
 }
 
 impl ClientBuilder {
@@ -96,8 +96,8 @@ impl ClientBuilder {
     ///
     /// Returns an error on construction if `blit_root` is the same as the installation
     /// root, since the system client should always be stateful.
-    pub fn ephemeral(mut self, blit_root: impl Into<PathBuf>) -> ClientBuilder {
-        self.blit_root = Some(blit_root.into());
+    pub fn ephemeral(mut self, blit_root: impl Into<PathBuf>, fstree_format: fstree::Format) -> ClientBuilder {
+        self.ephemeral = Some((blit_root.into(), fstree_format));
         self
     }
 
@@ -143,8 +143,8 @@ impl ClientBuilder {
             scope: Scope::Stateful { fstree_driver },
         };
 
-        if let Some(blit_root) = self.blit_root {
-            client = client.ephemeral(blit_root)?;
+        if let Some((blit_root, fstree_format)) = self.ephemeral {
+            client = client.ephemeral(blit_root, fstree_format)?;
         }
         Ok(client)
     }
@@ -178,7 +178,7 @@ impl Client {
             installation,
             repositories: None,
             system_model_path: None,
-            blit_root: None,
+            ephemeral: None,
         }
     }
 
@@ -220,7 +220,7 @@ impl Client {
     ///
     /// Returns an error if `blit_root` is the same as the installation root,
     /// since the system client should always be stateful.
-    pub fn ephemeral(self, blit_root: impl Into<PathBuf>) -> Result<Self, Error> {
+    pub fn ephemeral(self, blit_root: impl Into<PathBuf>, fstree_format: fstree::Format) -> Result<Self, Error> {
         let blit_root = blit_root.into();
 
         if blit_root.exists() && blit_root.canonicalize()? == self.installation.root.canonicalize()? {
@@ -230,10 +230,10 @@ impl Client {
         Ok(Self {
             scope: Scope::Ephemeral {
                 blit_root,
-                // TODO: Figure out if overlayimg makes sense for detached use, especially
-                // in unpriviledged contexts where mounting is restricted. Until then,
-                // force native driver for all detached blits.
-                fstree_driver: fstree::AnyDriver::native(),
+                fstree_driver: match fstree_format {
+                    fstree::Format::Native => fstree::AnyDriver::native(),
+                    fstree::Format::Overlayimg => fstree::AnyDriver::overlayimg(),
+                },
             },
             ..self
         })

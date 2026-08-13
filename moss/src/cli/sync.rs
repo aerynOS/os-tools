@@ -30,6 +30,15 @@ pub struct Command {
     #[arg(value_name = "dir", long = "to")]
     blit_target: Option<PathBuf>,
 
+    /// Fstree format used when `--to` is supplied
+    #[arg(
+        value_name = "format",
+        long = "to-format",
+        default_value = "native",
+        requires("blit_target")
+    )]
+    blit_target_format: super::FstreeFormatArg,
+
     /// Simulate the sync (dry-run)
     #[arg(long)]
     dry_run: bool,
@@ -58,7 +67,7 @@ pub fn handle(args: &ArgMatches, installation: Installation) -> Result<(), Error
 
     // Make ephemeral if a blit target was provided
     if let Some(blit_target) = command.blit_target {
-        client_builder = client_builder.ephemeral(blit_target);
+        client_builder = client_builder.ephemeral(blit_target, command.blit_target_format.into());
     }
 
     let mut client = client_builder.build()?;
