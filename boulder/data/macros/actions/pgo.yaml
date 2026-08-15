@@ -40,7 +40,7 @@ actions:
         description: Apply bolt profile
         command: |
             boptim(){
-                llvm-bolt ${1}.orig -o ${1}.bolt -data=%(pgo_dir)/$(basename ${1}).fdata -reorder-blocks=ext-tsp -reorder-functions=hfsort+ -split-functions -split-strategy=cdsplit -plt=all -peepholes=all -split-eh -dyno-stats -icf=1 -use-gnu-stack -use-old-text -update-debug-sections ${2} ${3} ${4}
+                llvm-bolt ${1}.orig -o ${1}.bolt -data=%(pgo_dir)/$(basename ${1}).fdata -reorder-blocks=ext-tsp -reorder-functions=cdsort -split-functions -split-strategy=cdsplit -plt=all -peepholes=all -split-eh -dyno-stats -icf -use-old-text -update-debug-sections ${2} ${3} ${4}
                 cp ${1}.bolt ${1}
             }
             boptim
