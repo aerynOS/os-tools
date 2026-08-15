@@ -357,7 +357,12 @@ impl Client {
     ///
     /// The current state gets archived.\
     /// Returns the old state that was archived.
-    pub fn activate_state(&self, id: state::Id, skip_triggers: bool, skip_boot: bool) -> Result<state::Id, Error> {
+    pub fn activate_state(
+        &self,
+        id: state::Id,
+        skip_triggers: bool,
+        skip_boot: bool,
+    ) -> Result<Option<state::Id>, Error> {
         // Fetch the new state
         let new = self.state_db.get(id).map_err(|_| Error::StateDoesntExist(id))?;
 
@@ -366,8 +371,11 @@ impl Client {
             return Err(Error::NoActiveState);
         };
 
+        // HAX: ensure overlayimgfs driver is mounted
         if new.id == old {
-            return Err(Error::StateAlreadyActive(id));
+            let mut fstree = self.open_archived_state(&new.id)?;
+            fstree.bring_up(fstree::Mutability::ReadOnly)?;
+            return Ok(None);
         }
 
         let staging_dir = self.installation.staging_dir();
@@ -402,7 +410,7 @@ impl Client {
             boot::synchronize(self, &new)?;
         }
 
-        Ok(old)
+        Ok(Some(old))
     }
 
     /// Create a new recorded state from the provided packages
@@ -1289,8 +1297,6 @@ pub struct BlittedRoot<'a> {
 pub enum Error {
     #[error("root must have an active state")]
     NoActiveState,
-    #[error("state {0} already active")]
-    StateAlreadyActive(state::Id),
     #[error("state {0} doesn't exist")]
     StateDoesntExist(state::Id),
     #[error("No metadata found for package {0:?}")]
