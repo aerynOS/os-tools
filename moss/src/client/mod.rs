@@ -11,6 +11,7 @@
 use std::{
     borrow::Borrow,
     io,
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -722,11 +723,18 @@ impl Client {
 
             if staged_usr.exists() {
                 // Bring down all binds
+                let root_dev = fs::metadata(&self.installation.root)?.dev();
                 let read_dir = fs::read_dir(&staged_usr)?;
                 for entry in read_dir.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
 
-                    if ![".stateID", ".", ".."].contains(&name.as_str()) && fs::read_link(entry.path()).is_err() {
+                    if ![ ".stateID", ".", ".." ].contains(&name.as_str())
+                        && fs::read_link(entry.path()).is_err()
+                        // Only unmount entries that are actually mounts; the rest
+                        // are plain dirs/symlinks when the fstree was never brought
+                        // up (e.g. rollback during boot bring-up).
+                        && fs::metadata(entry.path())?.dev() != root_dev
+                    {
                         umount2(&entry.path(), MntFlags::MNT_DETACH).map_err(io::Error::other)?;
                     }
                 }
