@@ -650,6 +650,13 @@ impl Client {
                 // Copy .stateID so it can be statically referenced w/out the mount being up
                 fs::copy(archived_usr.join(".stateID"), staging_usr.join(".stateID"))?;
 
+                // Record the current fstx at the overlayimg root so the active
+                // image can be located w/out the fstree being mounted (e.g. boot)
+                fs::copy(
+                    archived_usr.join(".stateID"),
+                    self.installation.root_path("overlayimg/.stateID"),
+                )?;
+
                 // Construct all binds into the mounted usr
                 let read_dir = fs::read_dir(&archived_usr)?;
                 for entry in read_dir.flatten() {
