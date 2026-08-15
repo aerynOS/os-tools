@@ -670,32 +670,7 @@ impl Client {
                 )?;
 
                 // Construct all binds into the mounted usr
-                let read_dir = fs::read_dir(&archived_usr)?;
-                for entry in read_dir.flatten() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-
-                    if ![".stateID", ".", ".."].contains(&name.as_str()) {
-                        let src = entry.path();
-                        let dest = staging_usr.join(&name);
-
-                        // Preserve if its a symlink (lib64, local)
-                        if let Ok(original) = fs::read_link(&src) {
-                            symlink(original, dest)?;
-                        }
-                        // Otherwise bind mount to the archived usr (into the overlay)
-                        else {
-                            fs::create_dir(&dest)?;
-                            mount(
-                                Some(&src.canonicalize()?),
-                                dest.as_path(),
-                                Option::<&str>::None,
-                                MsFlags::MS_BIND,
-                                Option::<&str>::None,
-                            )
-                            .map_err(io::Error::other)?;
-                        }
-                    }
-                }
+                self.bind_usr_children(&archived_usr, &staging_usr, true)?;
             }
             // Nothing to do here, we move the native fstree usr/ in the atomic swap
             fstree::Format::Native => {}
@@ -703,6 +678,86 @@ impl Client {
 
         // Now swap staging with live
         atomic_swap(&staging_usr, &root_usr).map_err(Error::AtomicSwap)?;
+
+        Ok(())
+    }
+
+    /// Wire the children of the archived `usr/` into `target_usr`.
+    ///
+    /// The archived `usr/` is an overlay mount; its real children (bin, lib,
+    /// libexec, sbin, share, ...) are bind mounted into the target `usr/`
+    /// while symlinks (lib64, local) are preserved as-is.
+    ///
+    /// When `fresh` is set, the target is expected to be empty and children
+    /// are created & mounted unconditionally. Otherwise missing children are
+    /// recreated and only children that aren't already mounted are bound
+    /// (e.g. re-bringing up an already active state after a reboot).
+    fn bind_usr_children(&self, archived_usr: &Path, target_usr: &Path, fresh: bool) -> Result<(), Error> {
+        // Root device so we can detect whether a child is already mounted
+        let root_dev = fs::metadata(&self.installation.root)?.dev();
+
+        let read_dir = fs::read_dir(&archived_usr)?;
+        for entry in read_dir.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            if ![".stateID", ".", ".."].contains(&name.as_str()) {
+                let src = entry.path();
+                let dest = target_usr.join(&name);
+
+                // Preserve symlinks
+                if let Ok(original) = fs::read_link(&src) {
+                    // CHANGE!
+                    // Don't recreate existing links on mount bring up
+                    if fresh || fs::symlink_metadata(&dest).is_err() {
+                        symlink(original, dest)?;
+                    }
+                }
+                // Otherwise bind mount to the archived usr (into the overlay)
+                else {
+                    if fresh || fs::symlink_metadata(&dest).is_err() {
+                        fs::create_dir(&dest)?;
+                    }
+                    // Only bind if it isn't already mounted
+                    if fs::metadata(&dest)?.dev() == root_dev {
+                        mount(
+                            Some(&src.canonicalize()?),
+                            dest.as_path(),
+                            Option::<&str>::None,
+                            MsFlags::MS_BIND,
+                            Option::<&str>::None,
+                        )
+                        .map_err(io::Error::other)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Ensure the live `usr/` is wired into the archived fstree of the
+    /// currently active state.
+    ///
+    /// Promotion binds the children of the archived `usr/` into the live
+    /// `usr/`, but those mounts are not persistent. After a reboot or when
+    /// operating on a destdir whose mounts were never brought up, the live
+    /// `usr/` is only a set of empty dirs; this re-establishes them.
+    fn bring_up_usr(&self, fstree: &Fstree<'_>) -> Result<(), Error> {
+        if !matches!(fstree.format(), fstree::Format::Overlayimg) {
+            return Ok(());
+        }
+
+        let root_usr = self.installation.root.join("usr");
+        let archived_usr = fstree.path.join("usr");
+
+        // Ensure the live usr exists with a static `.stateID` marker
+        fs::create_dir_all(&root_usr)?;
+        if !root_usr.join(".stateID").try_exists()? {
+            fs::copy(archived_usr.join(".stateID"), root_usr.join(".stateID"))?;
+        }
+
+        // Re-establish the bind mounts & symlinks
+        self.bind_usr_children(&archived_usr, &root_usr, false)?;
 
         Ok(())
     }
