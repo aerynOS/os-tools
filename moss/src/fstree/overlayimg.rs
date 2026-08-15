@@ -191,15 +191,23 @@ pub fn bring_down(target: &Path) -> Result<(), Error> {
 }
 
 fn mount_all(installation: &Installation, mutability: Mutability, paths: &Paths) -> Result<(), Error> {
-    // Mount EROFS
-    mount(
-        Some(&paths.erofs_image),
-        &paths.erofs,
-        Some("erofs"),
-        MsFlags::empty(),
-        Some(""),
-    )
-    .whatever_context("mount erofs.img")?;
+    let stat_path = |path: &Path| stat(path).with_whatever_context(|_| format!("stat {}", path.display()));
+
+    // Stat the fstree root so we can compare `st_dev` against the mountpoints
+    // to validate whether they are already mounted prior to mounting.
+    let root_stat = stat_path(&paths.root)?;
+
+    // Mount EROFS (if not already mounted)
+    if stat_path(&paths.erofs)?.st_dev == root_stat.st_dev {
+        mount(
+            Some(&paths.erofs_image),
+            &paths.erofs,
+            Some("erofs"),
+            MsFlags::empty(),
+            Some(""),
+        )
+        .whatever_context("mount erofs.img")?;
+    }
 
     let overlay_options = match mutability {
         Mutability::ReadOnly => format!(
@@ -217,15 +225,17 @@ fn mount_all(installation: &Installation, mutability: Mutability, paths: &Paths)
         ),
     };
 
-    // Mount overlay
-    mount(
-        Some("overlay"),
-        &paths.merged,
-        Some("overlay"),
-        MsFlags::empty(),
-        Some(overlay_options.as_str()),
-    )
-    .whatever_context("mount overlay")?;
+    // Mount overlay (if not already mounted)
+    if stat_path(&paths.merged)?.st_dev == root_stat.st_dev {
+        mount(
+            Some("overlay"),
+            &paths.merged,
+            Some("overlay"),
+            MsFlags::empty(),
+            Some(overlay_options.as_str()),
+        )
+        .whatever_context("mount overlay")?;
+    }
 
     Ok(())
 }
