@@ -12,13 +12,11 @@ sysroot="$1"
 fstx_id=$(getarg moss.fstx)
 [ -z "$fstx_id" ] && exit 0
 
-# Grab the current fstx from `/sysroot/usr/.stateID`
-current_fstx=$(cat "$sysroot/usr/.stateID" 2>/dev/null)
+# Grab the current fstx from the static copy stored under the moss root
+current_fstx=$(cat "$sysroot/.moss/root/overlayimg/.stateID" 2>/dev/null)
 [ -z "$current_fstx" ] && exit 1
 
-# If the current fstx is already the same as the one we're trying to set, exit
-[ "$current_fstx" = "$fstx_id" ] && exit 0
-
-# Set the new fstx
+# Activate the requested fstx (no-op if already active & mounted).
+#
 # TODO: Ask the user if they want to perform the rollback using plymouth.
 moss -D "$sysroot" state activate -y --skip-triggers "$fstx_id"
