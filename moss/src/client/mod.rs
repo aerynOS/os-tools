@@ -127,10 +127,12 @@ impl ClientBuilder {
         let fstree_format = None
             .or_else(environment::fstree_format)
             .unwrap_or(fstree::Format::Native);
-        let fstree_driver = match fstree_format {
+        let mut fstree_driver = match fstree_format {
             fstree::Format::Native => fstree::AnyDriver::native(),
             fstree::Format::Overlayimg => fstree::AnyDriver::overlayimg(),
         };
+
+        fstree_driver = fstree::AnyDriver::overlayimg();
 
         let mut client = Client {
             config,
