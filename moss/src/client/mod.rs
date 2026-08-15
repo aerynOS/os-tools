@@ -378,6 +378,7 @@ impl Client {
         if new.id == old {
             let mut fstree = self.open_archived_state(&new.id)?;
             fstree.bring_up(fstree::Mutability::ReadOnly)?;
+            self.bring_up_usr(&fstree)?;
             return Ok(None);
         }
 
