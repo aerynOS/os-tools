@@ -15,7 +15,7 @@ rust-version = "1.94"
 astr.path = "crates/astr"
 vfs.path = "crates/vfs"
 stone.path = "crates/stone"
-blsforme = { git = "https://github.com/AerynOS/blsforme.git", rev = "55da60a60b6f883818fbd67c67557439787f2fce" }
+blsforme = { git = "https://github.com/joebonrichie/blsforme.git", rev = "b116cc6d4550f9c992df7a6f452ed2cce40692c8" }
 bytes = "1.6.0"
 camino = "1.1.10"
 chrono = "0.4.38"
