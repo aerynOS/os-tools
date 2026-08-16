@@ -213,66 +213,71 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
         }
     }
 
-    let global_schema = os_schema_for_root(&root)?;
+    // Always remember to bring down again
+    let result = (|| -> Result<(), Error> {
+        let global_schema = os_schema_for_root(&root)?;
 
-    // Grab the entries for the new state
-    let mut all_kernels = vec![];
-    for state in all_states.iter() {
-        let layouts = layouts_for_state(client, state.state())?;
-        let local_kernels = kernel_files_from_state(&layouts, &kernel_pattern);
-        let mapped = global_schema.discover_system_kernels(local_kernels.into_iter())?;
-        all_kernels.push((mapped, state));
-    }
+        // Grab the entries for the new state
+        let mut all_kernels = vec![];
+        for state in all_states.iter() {
+            let layouts = layouts_for_state(client, state.state())?;
+            let local_kernels = kernel_files_from_state(&layouts, &kernel_pattern);
+            let mapped = global_schema.discover_system_kernels(local_kernels.into_iter())?;
+            all_kernels.push((mapped, state));
+        }
 
-    // pipe all of our entries into blsforme
-    let entries = all_kernels
-        .iter()
-        .flat_map(|&(ref kernels, state_entry)| {
-            let rootref = &root;
-            let configref = &config;
-            kernels.iter().filter_map(move |k| {
-                let state_id = state_entry.state().id;
-                let sysroot = match state_entry {
-                    StateEntry::Active(_) => rootref.clone(),
-                    StateEntry::Archived { fstree, .. } => fstree.path.clone(),
-                };
+        // pipe all of our entries into blsforme
+        let entries = all_kernels
+            .iter()
+            .flat_map(|&(ref kernels, state_entry)| {
+                let rootref = &root;
+                let configref = &config;
+                kernels.iter().filter_map(move |k| {
+                    let state_id = state_entry.state().id;
+                    let sysroot = match state_entry {
+                        StateEntry::Active(_) => rootref.clone(),
+                        StateEntry::Archived { fstree, .. } => fstree.path.clone(),
+                    };
 
-                if !sysroot.exists() {
-                    return None;
-                }
+                    if !sysroot.exists() {
+                        return None;
+                    }
 
-                let local_schema = os_schema_for_root(&sysroot).ok();
-                let entry = Entry::new(configref, k)
-                    .with_cmdline(format!("moss.fstx={state_id}"))
-                    .with_state_id(i32::from(state_id))
-                    .with_sysroot(sysroot);
+                    let local_schema = os_schema_for_root(&sysroot).ok();
+                    let entry = Entry::new(configref, k)
+                        .with_cmdline(format!("moss.fstx={state_id}"))
+                        .with_state_id(i32::from(state_id))
+                        .with_sysroot(sysroot);
 
-                match local_schema {
-                    Some(schema) => Some(entry.with_schema(schema)),
-                    None => Some(entry),
-                }
+                    match local_schema {
+                        Some(schema) => Some(entry.with_schema(schema)),
+                        None => Some(entry),
+                    }
+                })
             })
-        })
-        .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
-    // no usable entries, lets get out of here.
-    if entries.is_empty() {
-        return Ok(());
-    }
+        // no usable entries, lets get out of here.
+        if entries.is_empty() {
+            return Ok(());
+        }
 
-    // If we can't get a manager, find, but don't bomb. Its probably a topology failure.
-    let manager = match blsforme::Manager::new(&config) {
-        Ok(m) => m.with_entries(entries).with_bootloader_assets(booty_bits),
-        Err(_) => return Ok(()),
-    };
+        // If we can't get a manager, find, but don't bomb. Its probably a topology failure.
+        let manager = match blsforme::Manager::new(&config) {
+            Ok(m) => m.with_entries(entries).with_bootloader_assets(booty_bits),
+            Err(_) => return Ok(()),
+        };
 
-    // Only allow mounting pre-sync for a native run
-    if is_native {
-        let _mounts = manager.mount_partitions()?;
-        manager.sync(&global_schema)?;
-    } else {
-        manager.sync(&global_schema)?;
-    }
+        // Only allow mounting pre-sync for a native run
+        if is_native {
+            let _mounts = manager.mount_partitions()?;
+            manager.sync(&global_schema)?;
+        } else {
+            manager.sync(&global_schema)?;
+        }
+
+        Ok(())
+    })();
 
     // And finally bring all archived states back down
     for entry in all_states.iter_mut() {
@@ -281,7 +286,7 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
         }
     }
 
-    Ok(())
+    result
 }
 
 pub fn print_status(installation: &Installation) -> Result<(), Error> {
