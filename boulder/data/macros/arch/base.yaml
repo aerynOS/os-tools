@@ -793,6 +793,13 @@ flags               :
     - relr:
         ld        : "-Wl,-z,pack-relative-relocs"
 
+    # Toggle crel (OFF)
+    - crel:
+        llvm:
+            c     : "-Wa,--crel,--allow-experimental-crel"
+            cxx   : "-Wa,--crel,--allow-experimental-crel"
+            f     : "-Wa,--crel,--allow-experimental-crel"
+
     # Toggle gnu2 TLS descriptors (ON)
     - tls-gnu:
         c         : "-mtls-dialect=gnu2"
