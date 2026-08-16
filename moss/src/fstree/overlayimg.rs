@@ -211,13 +211,13 @@ fn mount_all(installation: &Installation, mutability: Mutability, paths: &Paths)
 
     let overlay_options = match mutability {
         Mutability::ReadOnly => format!(
-            "lowerdir={}:{}/usr::{}",
+            "lowerdir={}:{}/usr::{},userxattr",
             paths.extra.display(),
             paths.erofs.display(),
             installation.assets_path("v2").display(),
         ),
         Mutability::ReadWrite => format!(
-            "lowerdir={}/usr::{},upperdir={},workdir={}",
+            "lowerdir={}/usr::{},upperdir={},workdir={},userxattr",
             paths.erofs.display(),
             installation.assets_path("v2").display(),
             paths.extra.display(),
