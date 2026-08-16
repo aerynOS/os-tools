@@ -19,14 +19,23 @@ use super::{Driver, Mutability, PendingFile};
 
 pub use erofs::XattrNamespace;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct OverlayimgDriver {
     erofs_image_writer: erofs::MetaImageWriter,
 }
 
+impl Default for OverlayimgDriver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OverlayimgDriver {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            // TEMP HAXS TO TEST USERXATTR INSIDE VM
+            erofs_image_writer: erofs::MetaImageWriter::default().with_xattr_namespace(XattrNamespace::User),
+        }
     }
 
     pub fn with_xattr_namespace(self, xattr_namespace: XattrNamespace) -> Self {
