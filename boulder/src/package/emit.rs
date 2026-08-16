@@ -10,10 +10,11 @@ use std::{
 use fs_err::{self as fs, File};
 use itertools::Itertools;
 use moss::{Dependency, Provider, package::Meta, util};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
 use snafu::{ResultExt, Snafu};
 use stone::{StoneHeaderV1FileType, StoneWriteError, StoneWriter};
-use tui::{ProgressBar, ProgressStyle, Styled};
+use tui::{MultiProgress, ProgressBar, ProgressStyle, Styled};
 
 use self::manifest::Manifest;
 use super::analysis;
@@ -186,9 +187,25 @@ pub fn emit(paths: &Paths, recipe: &Recipe, packages: &[Package<'_>]) -> Result<
 
     println!("Packaging");
 
-    for package in packages {
-        emit_package(paths, package)?;
-    }
+    // Each package's zstd encoder spawns its own worker threads, so split
+    // across cores evenly to avoid oversubscribing cores for the number of
+    // packages being processed concurrently.
+    let num_cpus = util::num_cpus().get();
+    let max_concurrent = num_cpus.min(4).min(packages.len().max(1));
+    let workers = num_cpus.div_ceil(max_concurrent) as u32;
+
+    let mp = MultiProgress::new();
+
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(max_concurrent)
+        .build()
+        .context(RayonSnafu)?
+        .install(|| {
+            packages
+                .par_iter()
+                .map(|package| emit_package(paths, package, workers, &mp))
+                .collect::<Result<Vec<_>, _>>()
+        })?;
 
     if emit_manifests {
         manifest.write_binary().context(ManifestSnafu)?;
@@ -200,7 +217,7 @@ pub fn emit(paths: &Paths, recipe: &Recipe, packages: &[Package<'_>]) -> Result<
     Ok(())
 }
 
-fn emit_package(paths: &Paths, package: &Package<'_>) -> Result<(), Error> {
+fn emit_package(paths: &Paths, package: &Package<'_>, workers: u32, mp: &MultiProgress) -> Result<(), Error> {
     let filename = package.filename();
 
     // Filter for all files -> dedupe by hash -> sort largest to smallest
@@ -219,13 +236,15 @@ fn emit_package(paths: &Paths, package: &Package<'_>) -> Result<(), Error> {
 
     let total_file_size = files.iter().map(|info| info.size).sum();
 
-    let pb = ProgressBar::new(total_file_size)
-        .with_message(format!("Generating {filename}"))
-        .with_style(
-            ProgressStyle::with_template(" {spinner} |{percent:>3}%| {wide_msg} {binary_bytes_per_sec:>.dim} ")
-                .unwrap()
-                .tick_chars("--=≡■≡=--"),
-        );
+    let pb = mp.add(
+        ProgressBar::new(total_file_size)
+            .with_message(format!("Generating {filename}"))
+            .with_style(
+                ProgressStyle::with_template(" {spinner} |{percent:>3}%| {wide_msg} {binary_bytes_per_sec:>.dim} ")
+                    .unwrap()
+                    .tick_chars("--=≡■≡=--"),
+            ),
+    );
     pb.enable_steady_tick(Duration::from_millis(150));
 
     // Output file to artefacts directory
@@ -272,7 +291,7 @@ fn emit_package(paths: &Paths, package: &Package<'_>) -> Result<(), Error> {
 
         // Convert to content writer using pledged size = total size of all files
         let mut writer = writer
-            .with_content(&mut temp_content, Some(total_file_size), util::num_cpus().get() as u32)
+            .with_content(&mut temp_content, Some(total_file_size), workers)
             .context(StoneBinaryWriterSnafu)?;
 
         for info in files {
@@ -294,8 +313,9 @@ fn emit_package(paths: &Paths, package: &Package<'_>) -> Result<(), Error> {
         out_file.flush().context(IoSnafu)?;
     }
 
-    pb.suspend(|| println!("{} {filename}", "Emitted".green()));
-    pb.finish_and_clear();
+    pb.finish();
+    mp.remove(&pb);
+    mp.suspend(|| println!("{} {filename}", "Emitted".green(),));
 
     Ok(())
 }
@@ -304,6 +324,8 @@ fn emit_package(paths: &Paths, package: &Package<'_>) -> Result<(), Error> {
 pub enum Error {
     #[snafu(display("stone binary writer"))]
     StoneBinaryWriter { source: StoneWriteError },
+    #[snafu(display("rayon thread pool"))]
+    Rayon { source: rayon::ThreadPoolBuildError },
     #[snafu(display("manifest"))]
     Manifest { source: manifest::Error },
     #[snafu(display("io"))]
