@@ -112,7 +112,7 @@ impl Drafter {
 
         #[rustfmt::skip]
         let template = format!(
-"# SPDX-FileCopyrightText: {year} AerynOS Developers
+"# SPDX-FileCopyrightText: {year} aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 name        : {}
