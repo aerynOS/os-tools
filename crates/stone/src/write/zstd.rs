@@ -82,6 +82,9 @@ impl Encoder {
         context
             .set_parameter(CParameter::WindowLog(31))
             .map_err(map_error_code)?;
+        context
+            .set_parameter(CParameter::JobSize(16777216))
+            .map_err(map_error_code)?;
         Ok(Self {
             context,
             output: vec![0; Context::out_size()],
