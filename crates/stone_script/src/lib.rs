@@ -159,38 +159,6 @@ pub use env::{Action, Definition, ScriptEnv};
 pub use error::{Error, EvalError};
 pub use expr::{Expr, Fragment};
 
-/// Evaluate an [Expr] in a single-use context and extract the output as a string
-///
-/// ```rust
-/// # use stone_script::{Definition, Expr, ScriptEnv};
-///
-/// let mut env = ScriptEnv::new();
-/// env.add_definition("name", Definition {
-///     doc: None,
-///     value: Expr::parse("Seymour").unwrap(),
-/// });
-/// env.add_definition("item", Definition {
-///     doc: None,
-///     value: Expr::parse("fast food").unwrap(),
-/// });
-/// env.add_definition("adverb", Definition {
-///     doc: None,
-///     value: Expr::parse("Delightfully").unwrap(),
-/// });
-///
-/// let expr = Expr::parse("What if I would purchase %(item) and disguise it as my own cooking? %(adverb) devilish, %(name).").unwrap();
-///
-/// assert_eq!(
-///     stone_script::eval_to_string(&env, &expr).unwrap(),
-///     "What if I would purchase fast food and disguise it as my own cooking? Delightfully devilish, Seymour.",
-/// );
-/// ```
-pub fn eval_to_string(env: &ScriptEnv, expr: &Expr) -> Result<String, Error> {
-    let mut ctx = ScriptContext::new();
-    ctx.eval(env, expr)?;
-    Ok(ctx.flush_to_string())
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

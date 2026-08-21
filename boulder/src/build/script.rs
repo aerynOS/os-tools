@@ -20,8 +20,8 @@ pub struct ScriptBundle {
 impl ScriptBundle {
     /// Compile a [ScriptBundle] from an [stone_script::Expr], using a specified [stone_script::ScriptEnv]
     pub fn build(env: ScriptEnv, prefix_expr: &Expr, expr: &Expr) -> Result<Self, Error> {
-        let prefix = stone_script::eval_to_string(&env, prefix_expr)?;
         let mut ctx = ScriptContext::new();
+        let prefix = ctx.eval_to_string(&env, prefix_expr)?;
         ctx.eval(&env, expr)?;
         let commands = ctx
             .flush_commands()

@@ -206,6 +206,41 @@ impl ScriptContext {
         Ok(())
     }
 
+    /// Evaluate an expression in this context, flushing its output as a string
+    ///
+    /// State accumulated in this context (such as dependencies) is preserved
+    /// across evaluations.
+    ///
+    /// ```rust
+    /// # use stone_script::{Definition, Expr, ScriptContext, ScriptEnv};
+    ///
+    /// let mut env = ScriptEnv::new();
+    /// env.add_definition("name", Definition {
+    ///     doc: None,
+    ///     value: Expr::parse("Seymour").unwrap(),
+    /// });
+    /// env.add_definition("item", Definition {
+    ///     doc: None,
+    ///     value: Expr::parse("fast food").unwrap(),
+    /// });
+    /// env.add_definition("adverb", Definition {
+    ///     doc: None,
+    ///     value: Expr::parse("Delightfully").unwrap(),
+    /// });
+    ///
+    /// let expr = Expr::parse("What if I would purchase %(item) and disguise it as my own cooking? %(adverb) devilish, %(name).").unwrap();
+    ///
+    /// let mut ctx = ScriptContext::new();
+    /// assert_eq!(
+    ///     ctx.eval_to_string(&env, &expr).unwrap(),
+    ///     "What if I would purchase fast food and disguise it as my own cooking? Delightfully devilish, Seymour.",
+    /// );
+    /// ```
+    pub fn eval_to_string(&mut self, env: &ScriptEnv, expr: &Expr) -> Result<String, Error> {
+        self.eval(env, expr)?;
+        Ok(self.flush_to_string())
+    }
+
     /// Flush all the emitted commands from the context
     pub fn flush_commands(&mut self) -> impl Iterator<Item = Command> {
         self.commands.drain(..)
