@@ -1,273 +1,331 @@
 // SPDX-FileCopyrightText: 2023 AerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use std::{env, io, path::Path, path::PathBuf};
+use std::{env, io, ops::Deref, path::PathBuf, slice};
 
-use clap::{Arg, ArgAction, Command};
+use clap::{Args, CommandFactory, Parser};
 use clap_complete::{
     generate_to,
     shells::{Bash, Fish, Zsh},
 };
 use clap_mangen::Man;
-use fs_err as fs;
-use moss::{Installation, installation};
+use fs_err::{self as fs, File};
+use moss::{Installation, client, installation};
 use thiserror::Error;
-use tracing_common::{self, logging::LogConfig, logging::init_log_with_config};
 use tui::Styled;
 
 mod boot;
 mod cache;
-mod extract;
-mod fetch;
 mod index;
-mod info;
-mod inspect;
-mod install;
-mod list;
-mod remove;
+mod package;
 mod repo;
 mod search;
 mod search_file;
 mod state;
 mod sync;
-mod version;
 
-/// Generate the CLI command structure
-fn command() -> Command {
-    Command::new("moss")
-        .about("Advanced system state & package manager")
-        .arg(
-            Arg::new("verbose")
-                .short('v')
-                .long("verbose")
-                .global(true)
-                .help("Prints additional information about what moss is doing")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("version")
-                .short('V')
-                .long("version")
-                .global(true)
-                .help("Prints version information about the binary")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("root")
-                .short('D')
-                .long("directory")
-                .global(true)
-                .help("Root directory")
-                .action(ArgAction::Set)
-                .default_value("/")
-                .value_parser(clap::value_parser!(PathBuf)),
-        )
-        .arg(
-            Arg::new("cache")
-                .long("cache")
-                .global(true)
-                .help("Cache directory")
-                .action(ArgAction::Set)
-                .value_parser(clap::value_parser!(PathBuf)),
-        )
-        .arg(
-            Arg::new("log")
-                .long("log")
-                .help("Logging configuration: <level>[:<format>][:<destination>]\nLevels: trace, debug, info, warn, error\nFormats: text, json\nDestinations: stderr, <file>")
-                .action(ArgAction::Set)
-                .global(true)
-                .value_parser(clap::value_parser!(LogConfig)),
-        )
-        .arg(
-            Arg::new("yes")
-                .short('y')
-                .long("yes-all")
-                .global(true)
-                .help("Assume yes for all questions")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("generate-manpages")
-                .long("generate-manpages")
-                .help("Generate manpages")
-                .action(ArgAction::Set)
-                .value_name("DIR")
-                .hide(true),
-        )
-        .arg(
-            Arg::new("generate-completions")
-                .long("generate-completions")
-                .help("Generate shell completions")
-                .action(ArgAction::Set)
-                .value_name("DIR")
-                .hide(true),
-        )
-        .arg_required_else_help(true)
-        .subcommand(boot::command())
-        .subcommand(cache::command())
-        .subcommand(extract::command())
-        .subcommand(fetch::command())
-        .subcommand(index::command())
-        .subcommand(info::command())
-        .subcommand(inspect::command())
-        .subcommand(install::command())
-        .subcommand(list::command())
-        .subcommand(remove::command())
-        .subcommand(repo::command())
-        .subcommand(search::command())
-        .subcommand(search_file::command())
-        .subcommand(state::command())
-        .subcommand(sync::command())
-        .subcommand(version::command())
+pub fn run() -> Result<(), BoxedError> {
+    Command::parse_from(ExpandedArgs::from(env::args())).run()
 }
 
-/// Generate manpages for all commands recursively
-fn generate_manpages(cmd: &Command, dir: &Path, prefix: Option<&str>) -> io::Result<()> {
-    let name = cmd.get_name();
-    let man = Man::new(cmd.to_owned());
-    let mut buffer: Vec<u8> = Default::default();
-    man.render(&mut buffer)?;
-
-    let filename = if let Some(prefix) = prefix {
-        format!("{prefix}-{name}.1")
-    } else {
-        format!("{name}.1")
-    };
-
-    fs::write(dir.join(filename), buffer)?;
-
-    for subcmd in cmd.get_subcommands() {
-        let new_prefix = if let Some(p) = prefix {
-            format!("{p}-{name}")
-        } else {
-            name.to_owned()
-        };
-        generate_manpages(subcmd, dir, Some(&new_prefix))?;
-    }
-    Ok(())
+/// Whether to interactively ask the
+/// user for confirmation or not.
+/// When [Confirmation::DoNotAsk], the operation will continue
+/// without any user interaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Confirmation {
+    Ask,
+    DoNotAsk,
 }
 
-/// Generate shell completions
-fn generate_completions(cmd: &mut Command, dir: &Path) -> io::Result<()> {
-    generate_to(Bash, cmd, "moss", dir)?;
-    generate_to(Fish, cmd, "moss", dir)?;
-    generate_to(Zsh, cmd, "moss", dir)?;
-    Ok(())
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("cache")]
+    Cache(#[from] cache::Error),
+
+    #[error(transparent)]
+    Client(#[from] client::Error),
+
+    #[error("index")]
+    Index(#[from] client::index::Error),
+
+    #[error(transparent)]
+    Package(#[from] package::Error),
+
+    #[error("repo")]
+    Repo(#[from] repo::Error),
+
+    #[error("search")]
+    Search(#[from] search::Error),
+
+    #[error("search-file")]
+    SearchFile(#[from] search_file::Error),
+
+    #[error("state")]
+    State(#[from] state::Error),
+
+    #[error("installation")]
+    Installation(#[from] installation::Error),
+
+    #[error("I/O error")]
+    Io(#[from] io::Error),
 }
 
-/// Process all CLI arguments
-pub fn process() -> Result<(), Error> {
-    let args = replace_aliases(env::args());
-    let matches = command().get_matches_from(args);
+pub struct BoxedError(Box<Error>);
 
-    let show_version = matches.get_one::<bool>("version").is_some_and(|v| *v);
-    let verbose = matches.get_flag("verbose");
-
-    if show_version {
-        println!("moss {}", tools_buildinfo::get_full_version());
+impl<E: std::error::Error> From<E> for BoxedError
+where
+    Error: From<E>,
+{
+    fn from(value: E) -> Self {
+        let error = Error::from(value);
+        Self(Box::new(error))
     }
+}
 
-    if let Some(log_config) = matches.get_one::<LogConfig>("log") {
-        init_log_with_config(log_config.clone());
+impl Deref for BoxedError {
+    type Target = Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
+}
 
-    if let Some(dir) = matches.get_one::<String>("generate-manpages") {
-        let dir = Path::new(dir);
-        fs::create_dir_all(dir)?;
-        generate_manpages(&command(), dir, None)?;
-        return Ok(());
-    }
+/// Generate the new CLI command structure
+#[derive(Debug, Parser)]
+#[command(
+    disable_version_flag = true,
+    propagate_version = true,
+    version = tools_buildinfo::get_full_version(),
+)]
+struct Command {
+    #[command(subcommand)]
+    subcommand: Subcommand,
+    #[command(flatten)]
+    global: Global,
+}
 
-    if let Some(dir) = matches.get_one::<String>("generate-completions") {
-        let dir = Path::new(dir);
-        fs::create_dir_all(dir)?;
-        generate_completions(&mut command(), dir)?;
-        return Ok(());
-    }
+impl Command {
+    /// Run the CLI according to users' flags and arguments.
+    pub fn run(self) -> Result<(), BoxedError> {
+        if let Some(dir) = self.global.generate_manpages {
+            fs::create_dir_all(&dir)?;
+            let main_cmd = Command::command();
+            // Generate man page for the main command
+            let main_man = Man::new(main_cmd.clone());
+            let mut buffer = File::create(dir.join("moss.1"))?;
+            main_man.render(&mut buffer)?;
 
-    // Print the version, but not if the user is using the version subcommand
-    if verbose
-        && let Some(command) = matches.subcommand_name()
-        && command != "version"
-    {
-        version::print();
-    }
+            // Generate man pages for all subcommands
+            for sub in main_cmd.get_subcommands() {
+                let sub_man = Man::new(sub.clone());
+                let name = format!("moss-{}.1", sub.get_name());
+                let mut buffer = File::create(dir.join(&name))?;
+                sub_man.render(&mut buffer)?;
 
-    let root = matches.get_one::<PathBuf>("root").unwrap();
-    let cache = matches.get_one::<PathBuf>("cache");
-
-    let installation = Installation::open(root, cache.cloned())?;
-
-    if let Some(system_model) = installation.system_model.as_ref() {
-        if !system_model.disable_warning {
-            print_system_model_warning(&installation, false);
-        } else if verbose {
-            print_system_model_warning(&installation, true);
-        }
-    }
-
-    match matches.subcommand() {
-        Some(("boot", args)) => boot::handle(args, installation).map_err(Error::Boot),
-        Some(("cache", args)) => cache::handle(args, installation).map_err(Error::Cache),
-        Some(("extract", args)) => extract::handle(args).map_err(Error::Extract),
-        Some(("fetch", args)) => fetch::handle(args, installation).map_err(Error::Fetch),
-        Some(("index", args)) => index::handle(args).map_err(Error::Index),
-        Some(("info", args)) => info::handle(args, installation).map_err(Error::Info),
-        Some(("inspect", args)) => inspect::handle(args).map_err(Error::Inspect),
-        Some(("install", args)) => install::handle(args, installation).map_err(Error::Install),
-        Some(("list", args)) => list::handle(args, installation).map_err(Error::List),
-        Some(("remove", args)) => remove::handle(args, installation).map_err(Error::Remove),
-        Some(("repo", args)) => repo::handle(args, installation).map_err(Error::Repo),
-        Some(("search", args)) => search::handle(args, installation).map_err(Error::Search),
-        Some(("search-file", args)) => search_file::handle(args, installation).map_err(Error::SearchFile),
-        Some(("state", args)) => state::handle(args, installation).map_err(Error::State),
-        Some(("sync", args)) => sync::handle(args, installation).map_err(Error::Sync),
-        Some(("version", args)) => {
-            version::handle(args);
-            Ok(())
-        }
-        None => {
-            if !show_version {
-                command().print_help().unwrap();
+                for nested in sub.get_subcommands() {
+                    let nested_man = Man::new(nested.clone());
+                    let name = format!("moss-{}-{}.1", sub.get_name(), nested.get_name());
+                    let mut buffer = File::create(dir.join(&name))?;
+                    nested_man.render(&mut buffer)?;
+                }
             }
-            Ok(())
+            return Ok(());
         }
-        _ => unreachable!(),
+
+        if let Some(dir) = self.global.generate_completions {
+            fs::create_dir_all(&dir)?;
+            let mut cmd = Command::command();
+            generate_to(Bash, &mut cmd, "moss", &dir)?;
+            generate_to(Fish, &mut cmd, "moss", &dir)?;
+            generate_to(Zsh, &mut cmd, "moss", &dir)?;
+            return Ok(());
+        }
+
+        // The default is "/" in the absence of an explicit arg.
+        let installation = Installation::open(
+            self.global.root_dir.clone().unwrap_or_default(),
+            self.global.cache_dir.clone(),
+        )?;
+
+        if let Some(system_model) = installation.system_model.as_ref() {
+            if !system_model.disable_warning {
+                print_system_model_warning(&installation, false);
+            } else if self.global.verbose {
+                print_system_model_warning(&installation, true);
+            }
+        }
+
+        match self.subcommand {
+            Subcommand::Boot(cmd) => cmd.handle(installation)?,
+            Subcommand::Cache(cmd) => cmd.handle(installation)?,
+            Subcommand::Index(cmd) => cmd.handle()?,
+            Subcommand::Package(cmd) => cmd.handle(self.global, installation)?,
+            Subcommand::Repo(cmd) => cmd.handle(installation)?,
+            Subcommand::Search(cmd) => cmd.handle(installation)?,
+            Subcommand::SearchFile(cmd) => cmd.handle(installation)?,
+            Subcommand::State(cmd) => cmd.handle(self.global, installation)?,
+            Subcommand::Sync(cmd) => cmd.handle(self.global, installation)?,
+        }
+
+        Ok(())
     }
 }
 
-fn replace_aliases(args: env::Args) -> Vec<String> {
-    const ALIASES: &[(&str, &[&str])] = &[
-        ("li", &["list", "installed"]),
-        ("la", &["list", "available"]),
-        ("ls", &["list", "sync"]),
-        ("lu", &["list", "sync"]),
-        ("ar", &["repo", "add"]),
-        ("lr", &["repo", "list"]),
-        ("rr", &["repo", "remove"]),
-        ("ur", &["repo", "update"]),
-        ("er", &["repo", "enable"]),
-        ("dr", &["repo", "disable"]),
-        ("fe", &["fetch"]),
-        ("ix", &["index"]),
-        ("it", &["install"]),
-        ("rm", &["remove"]),
-        ("up", &["sync"]),
-    ];
+/// Globally available arguments
+#[derive(Debug, Args)]
+struct Global {
+    #[arg(
+        short,
+        long = "verbose",
+        global = true,
+        help = "Prints additional information about what moss is doing",
+        help_heading = "Global Options",
+        default_value = "false",
+        global = true
+    )]
+    verbose: bool,
+    #[arg(
+        short = 'D',
+        long = "directory",
+        global = true,
+        help = "Root directory",
+        help_heading = "Global Options",
+        default_value = "/",
+        global = true
+    )]
+    root_dir: Option<PathBuf>,
+    #[arg(long, help = "Cache directory", global = true, help_heading = "Global Options")]
+    cache_dir: Option<PathBuf>,
+    #[arg(
+        long,
+        global = true,
+        help = "Logging configuration: <level>[:<format>][:<destination>]\nLevels: trace, debug, info, warn, error\nFormats: text, json\nDestinations: stderr, <file>",
+        help_heading = "Global Options",
+        global = true
+    )]
+    log: Option<String>,
+    #[arg(
+        short = 'y',
+        long = "yes",
+        global = true,
+        action = clap::ArgAction::SetTrue,
+        help = "Assume yes for all questions",
+        help_heading = "Global Options",
+    )]
+    confirm: Confirmation,
+    #[arg(
+        short = 'V',
+        long = "version",
+        global = true,
+        action = clap::ArgAction::Version,
+        help_heading = "Global Options",
+        help = "Print version and exit"
+    )]
+    version: bool,
+    #[arg(
+        long = "generate-manpages",
+        global = true,
+        help = "Generate man pages in specified directory",
+        help_heading = "Global Options",
+        value_name = "DIR",
+        hide = true
+    )]
+    generate_manpages: Option<PathBuf>,
+    #[arg(
+        long = "generate-completions",
+        global = true,
+        help = "Generate shell completions in specified directory",
+        help_heading = "Global Options",
+        value_name = "DIR",
+        hide = true
+    )]
+    generate_completions: Option<String>,
+}
 
-    let mut args = args.collect::<Vec<_>>();
+/// Iterator that wraps [std::env::Args] to translate command aliases
+/// into their expanded form.
+/// If no command alias was used, this iterator yields equally to [std::env::Args].
+///
+/// This is needed because clap [doesn't support](https://github.com/clap-rs/clap/discussions/3672)
+/// "application-level" aliases à la Git.
+struct ExpandedArgs {
+    args: env::Args,
+    expansion: Option<slice::Iter<'static, &'static str>>,
+}
 
-    for (alias, replacements) in ALIASES {
-        let Some(pos) = args.iter().position(|a| a == *alias) else {
-            continue;
-        };
-
-        args.splice(pos..pos + 1, replacements.iter().map(|&arg| arg.to_owned()));
-
-        break;
+impl From<env::Args> for ExpandedArgs {
+    fn from(args: env::Args) -> Self {
+        Self { args, expansion: None }
     }
+}
 
-    args
+impl Iterator for ExpandedArgs {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(exp) = &mut self.expansion {
+            return exp.next().map_or_else(|| self.args.next(), |arg| Some(arg.to_string()));
+        }
+        match self.args.next() {
+            Some(arg) if arg.starts_with('-') => Some(arg),
+            Some(arg) => {
+                let Ok(index) = Self::ALIASES.binary_search_by_key(&arg.as_str(), |&(alias, _)| alias) else {
+                    return Some(arg);
+                };
+                self.expansion = Some(Self::ALIASES[index].1.iter());
+                self.expansion.as_mut().unwrap().next().map(|arg| arg.to_string())
+            }
+            None => None,
+        }
+    }
+}
+
+impl ExpandedArgs {
+    // Keep this list sorted for the binary search.
+    // Ideally we would sort this list at compile time,
+    // but there's no such feature at the moment.
+    const ALIASES: &[(&str, &[&str])] = &[
+        ("pad", &["package", "add"]),
+        ("pex", &["package", "extract"]),
+        ("pfe", &["package", "fetch"]),
+        ("pif", &["package", "info"]),
+        ("pin", &["package", "inspect"]),
+        ("pls", &["package", "list"]),
+        ("prm", &["package", "remove"]),
+    ];
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Subcommand {
+    Boot(boot::Command),
+    Cache(cache::Command),
+    Index(index::Command),
+    Package(package::Command),
+    Repo(repo::Command),
+    Search(search::Command),
+    SearchFile(search_file::Command),
+    State(state::Command),
+    Sync(sync::Command),
+}
+
+impl From<bool> for Confirmation {
+    fn from(value: bool) -> Self {
+        if value {
+            Confirmation::DoNotAsk
+        } else {
+            Confirmation::Ask
+        }
+    }
+}
+
+impl From<&str> for Confirmation {
+    fn from(value: &str) -> Self {
+        match value.to_lowercase().as_str() {
+            "y" | "yes" | "true" => Confirmation::DoNotAsk,
+            _ => Confirmation::Ask,
+        }
+    }
 }
 
 fn print_system_model_warning(installation: &Installation, first_line_only: bool) {
@@ -289,56 +347,15 @@ fn print_system_model_warning(installation: &Installation, first_line_only: bool
     }
 }
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("boot")]
-    Boot(#[source] boot::Error),
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
 
-    #[error("cache")]
-    Cache(#[source] cache::Error),
+    use super::Command;
 
-    #[error("index")]
-    Index(#[source] index::Error),
-
-    #[error("info")]
-    Info(#[source] info::Error),
-
-    #[error("install")]
-    Install(#[source] install::Error),
-
-    #[error("list")]
-    List(#[source] list::Error),
-
-    #[error("inspect")]
-    Inspect(#[source] inspect::Error),
-
-    #[error("extract")]
-    Extract(#[source] extract::Error),
-
-    #[error("fetch")]
-    Fetch(#[source] fetch::Error),
-
-    #[error("remove")]
-    Remove(#[source] remove::Error),
-
-    #[error("repo")]
-    Repo(#[source] repo::Error),
-
-    #[error("search")]
-    Search(#[source] search::Error),
-
-    #[error("search-file")]
-    SearchFile(#[source] search_file::Error),
-
-    #[error("state")]
-    State(#[source] state::Error),
-
-    #[error("sync")]
-    Sync(#[source] sync::Error),
-
-    #[error("installation")]
-    Installation(#[from] installation::Error),
-
-    #[error("I/O error")]
-    Io(#[from] io::Error),
+    #[test]
+    fn cli_tree_is_valid() {
+        let cmd: clap::Command = Command::command();
+        cmd.debug_assert();
+    }
 }
