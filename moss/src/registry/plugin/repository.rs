@@ -82,9 +82,9 @@ impl Repository {
         self.query(flags, db::meta::Filter::Keyword(keyword))
     }
 
-    pub fn query_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::Name> {
+    pub fn package_summaries_by_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::PackageSummary> {
         if flags.available || flags == package::Flags::default() {
-            match self.active.db.package_names(db::meta::Filter::Prefix(prefix)) {
+            match self.active.db.package_summaries(db::meta::Filter::Prefix(prefix)) {
                 Ok(names) => names,
                 Err(error) => {
                     warn!("failed to query repository packages: {error}");

@@ -33,6 +33,13 @@ impl Name {
     }
 }
 
+/// A short package summary
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct PackageSummary {
+    pub name: Name,
+    pub summary: String,
+}
+
 /// The metadata of a [`super::Package`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Meta {

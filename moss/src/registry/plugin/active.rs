@@ -75,10 +75,10 @@ impl Active {
         self.query(flags, db::meta::Filter::Keyword(keyword))
     }
 
-    pub fn query_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::Name> {
+    pub fn package_summaries_by_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::PackageSummary> {
         let filter = db::meta::Filter::Prefix(prefix);
         if flags.installed || flags == package::Flags::default() {
-            match self.db.package_names(filter) {
+            match self.db.package_summaries(filter) {
                 Ok(names) => names,
                 Err(error) => {
                     warn!("failed to query repository packages: {error}");
