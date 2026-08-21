@@ -72,6 +72,21 @@ impl Plugin {
         })
     }
 
+    pub fn package_summaries_by_prefix(
+        &self,
+        prefix: &str,
+        flags: package::Flags,
+    ) -> package::Sorted<Vec<package::PackageSummary>> {
+        package::Sorted::new(match self {
+            Plugin::Active(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
+            Plugin::Cobble(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
+            Plugin::Repository(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
+
+            #[cfg(any(test, feature = "testing"))]
+            Plugin::Test(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
+        })
+    }
+
     /// Returns a list of packages with matching `provider` and `flags`
     pub fn query_provider(&self, provider: &Provider, flags: package::Flags) -> package::Sorted<Vec<Package>> {
         package::Sorted::new(match self {
@@ -166,6 +181,22 @@ pub mod test {
                         || pkg.meta.summary.to_ascii_lowercase().contains(&keyword_lower)
                 })
                 .cloned()
+                .collect()
+        }
+
+        pub fn package_summaries_by_prefix(
+            &self,
+            prefix: &str,
+            _flags: package::Flags,
+        ) -> Vec<package::PackageSummary> {
+            let prefix_lower = prefix.to_ascii_lowercase();
+            self.packages
+                .iter()
+                .filter(|pkg| pkg.meta.name.as_str().to_ascii_lowercase().starts_with(&prefix_lower))
+                .map(|pkg| package::PackageSummary {
+                    name: pkg.meta.name.clone(),
+                    summary: pkg.meta.summary.clone(),
+                })
                 .collect()
         }
 
