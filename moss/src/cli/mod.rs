@@ -23,13 +23,17 @@ mod search;
 mod search_file;
 mod state;
 mod sync;
-mod version;
 
 /// Generate the new CLI command structure
 #[derive(Debug, Parser)]
+#[command(
+    disable_version_flag = true,
+    propagate_version = true,
+    version = tools_buildinfo::get_full_version(),
+)]
 pub struct Command {
     #[command(subcommand)]
-    subcommand: Option<Subcommand>,
+    subcommand: Subcommand,
     #[command(flatten)]
     global: Global,
 }
@@ -37,11 +41,6 @@ pub struct Command {
 impl Command {
     /// Run the CLI according to users' flags and arguments.
     pub fn run(self) -> Result<(), BoxedError> {
-        // Prints the cli's information about version at startup
-        if self.global.version {
-            println!("moss {}", tools_buildinfo::get_full_version());
-        }
-
         if let Some(dir) = self.global.generate_manpages {
             fs::create_dir_all(&dir)?;
             let main_cmd = Command::command();
@@ -76,14 +75,6 @@ impl Command {
             return Ok(());
         }
 
-        // Print the version, but not if the user is using the version subcommand
-        if self.global.verbose {
-            match self.subcommand {
-                Some(Subcommand::Version(_)) => (),
-                _ => version::print(),
-            }
-        }
-
         // The default is "/" in the absence of an explicit arg.
         let installation = Installation::open(
             self.global.root_dir.clone().unwrap_or_default(),
@@ -99,17 +90,15 @@ impl Command {
         }
 
         match self.subcommand {
-            Some(Subcommand::Boot(cmd)) => cmd.handle(installation)?,
-            Some(Subcommand::Cache(cmd)) => cmd.handle(installation)?,
-            Some(Subcommand::Index(cmd)) => cmd.handle()?,
-            Some(Subcommand::Package(cmd)) => cmd.handle(self.global, installation)?,
-            Some(Subcommand::Repo(cmd)) => cmd.handle(installation)?,
-            Some(Subcommand::Search(cmd)) => cmd.handle(installation)?,
-            Some(Subcommand::SearchFile(cmd)) => cmd.handle(installation)?,
-            Some(Subcommand::State(cmd)) => cmd.handle(self.global, installation)?,
-            Some(Subcommand::Sync(cmd)) => cmd.handle(self.global, installation)?,
-            Some(Subcommand::Version(cmd)) => cmd.handle(),
-            None => unreachable!(),
+            Subcommand::Boot(cmd) => cmd.handle(installation)?,
+            Subcommand::Cache(cmd) => cmd.handle(installation)?,
+            Subcommand::Index(cmd) => cmd.handle()?,
+            Subcommand::Package(cmd) => cmd.handle(self.global, installation)?,
+            Subcommand::Repo(cmd) => cmd.handle(installation)?,
+            Subcommand::Search(cmd) => cmd.handle(installation)?,
+            Subcommand::SearchFile(cmd) => cmd.handle(installation)?,
+            Subcommand::State(cmd) => cmd.handle(self.global, installation)?,
+            Subcommand::Sync(cmd) => cmd.handle(self.global, installation)?,
         }
 
         Ok(())
@@ -129,16 +118,6 @@ pub struct Global {
         global = true
     )]
     pub verbose: bool,
-    #[arg(
-        short = 'V',
-        long,
-        global = true,
-        help = "Prints out version information and exits",
-        help_heading = "Global Options",
-        default_value = "false",
-        global = true
-    )]
-    pub version: bool,
     #[arg(
         short = 'D',
         long = "directory",
@@ -168,6 +147,15 @@ pub struct Global {
         help_heading = "Global Options",
     )]
     pub confirm: Confirmation,
+    #[arg(
+        short = 'V',
+        long = "version",
+        global = true,
+        action = clap::ArgAction::Version,
+        help_heading = "Global Options",
+        help = "Print version and exit"
+    )]
+    version: bool,
     #[arg(
         long = "generate-manpages",
         global = true,
@@ -209,7 +197,6 @@ enum Subcommand {
     SearchFile(search_file::Command),
     State(state::Command),
     Sync(sync::Command),
-    Version(version::Command),
 }
 
 impl From<bool> for Confirmation {
