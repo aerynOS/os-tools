@@ -72,14 +72,18 @@ impl Plugin {
         })
     }
 
-    pub fn query_prefix(&self, prefix: &str, flags: package::Flags) -> package::Sorted<Vec<package::Name>> {
+    pub fn package_summaries_by_prefix(
+        &self,
+        prefix: &str,
+        flags: package::Flags,
+    ) -> package::Sorted<Vec<package::PackageSummary>> {
         package::Sorted::new(match self {
-            Plugin::Active(plugin) => plugin.query_prefix(prefix, flags),
-            Plugin::Cobble(plugin) => plugin.query_prefix(prefix, flags),
-            Plugin::Repository(plugin) => plugin.query_prefix(prefix, flags),
+            Plugin::Active(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
+            Plugin::Cobble(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
+            Plugin::Repository(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
 
             #[cfg(any(test, feature = "testing"))]
-            Plugin::Test(plugin) => plugin.query_prefix(prefix, flags),
+            Plugin::Test(plugin) => plugin.package_summaries_by_prefix(prefix, flags),
         })
     }
 
@@ -180,12 +184,19 @@ pub mod test {
                 .collect()
         }
 
-        pub fn query_prefix(&self, prefix: &str, _flags: package::Flags) -> Vec<package::Name> {
+        pub fn package_summaries_by_prefix(
+            &self,
+            prefix: &str,
+            _flags: package::Flags,
+        ) -> Vec<package::PackageSummary> {
             let prefix_lower = prefix.to_ascii_lowercase();
             self.packages
                 .iter()
                 .filter(|pkg| pkg.meta.name.as_str().to_ascii_lowercase().starts_with(&prefix_lower))
-                .map(|pkg| pkg.meta.name.clone())
+                .map(|pkg| package::PackageSummary {
+                    name: pkg.meta.name.clone(),
+                    summary: pkg.meta.summary.clone(),
+                })
                 .collect()
         }
 

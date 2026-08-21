@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 AerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
+use clap::builder::StyledStr;
 use clap_complete::CompletionCandidate;
-use itertools::Itertools;
 use std::path::PathBuf;
 
 use crate::{Installation, client, package};
@@ -11,11 +11,9 @@ const MAX_RESULTS: usize = 100;
 
 pub fn generate_results(client: &client::Client, flags: package::Flags, prefix: &str) -> Vec<CompletionCandidate> {
     client
-        .search_packages_by_prefix(prefix, flags)
-        .map(|name| name.to_string())
-        .unique()
+        .search_package_summaries_by_prefix(prefix, flags)
         .take(MAX_RESULTS)
-        .map(CompletionCandidate::new)
+        .map(|pkg| CompletionCandidate::new(pkg.name.to_string()).help(Some(StyledStr::from(pkg.summary))))
         .collect()
 }
 

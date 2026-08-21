@@ -77,17 +77,17 @@ impl Database {
         })
     }
 
-    pub fn package_names(&self, filter: Filter<'_>) -> Result<Vec<package::Name>, Error> {
+    pub fn package_summaries(&self, filter: Filter<'_>) -> Result<Vec<package::PackageSummary>, Error> {
         self.conn.exec(|conn| {
             let mut stmt;
             let meta_query = match filter {
                 Filter::Id(id) => {
-                    stmt = conn.prepare("SELECT name FROM meta WHERE package = ?")?;
+                    stmt = conn.prepare("SELECT name, summary FROM meta WHERE package = ?")?;
                     stmt.query([id.as_str()])
                 }
                 Filter::Provider(provider) => {
                     stmt = conn.prepare(indoc! {"
-                        SELECT m.name
+                        SELECT m.name, m.summary
                         FROM meta m
                         INNER JOIN meta_providers mp ON m.package = mp.package
                         WHERE mp.provider = ?"})?;
@@ -95,28 +95,28 @@ impl Database {
                 }
                 Filter::Dependency(dependency) => {
                     stmt = conn.prepare(indoc! {"
-                        SELECT m.name
+                        SELECT m.name, m.summary
                         FROM meta m
                         INNER JOIN meta_dependencies md ON m.package = md.package
                         WHERE md.dependency = ?"})?;
                     stmt.query([dependency.to_string()])
                 }
                 Filter::Name(name) => {
-                    stmt = conn.prepare("SELECT name FROM meta WHERE name = ?")?;
+                    stmt = conn.prepare("SELECT name, summary FROM meta WHERE name = ?")?;
                     stmt.query([name.to_string()])
                 }
                 Filter::Keyword(kw) => {
                     stmt = conn.prepare(
-                        "SELECT name FROM meta WHERE name LIKE concat('%', ?1, '%') OR summary LIKE concat('%', ?1, '%')",
+                        "SELECT name, summary FROM meta WHERE name LIKE concat('%', ?1, '%') OR summary LIKE concat('%', ?1, '%')",
                     )?;
                     stmt.query([kw.to_owned()])
                 }
                 Filter::All => {
-                    stmt = conn.prepare("SELECT name FROM meta")?;
+                    stmt = conn.prepare("SELECT name, summary FROM meta")?;
                     stmt.query([])
                 }
                 Filter::Prefix(prefix) => {
-                    stmt = conn.prepare("SELECT name FROM meta WHERE name LIKE concat(?1, '%')")?;
+                    stmt = conn.prepare("SELECT name, summary FROM meta WHERE name LIKE concat(?1, '%')")?;
                     stmt.query([prefix.to_owned()])
                 }
             }?;
@@ -124,7 +124,8 @@ impl Database {
             let entries = meta_query
                 .mapped(|row| {
                     let name = package::Name::from(row.get::<_, String>("name")?);
-                    Ok( name)
+                    let summary = row.get::<_, String>("summary")?;
+                    Ok( package::PackageSummary {name, summary})
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
