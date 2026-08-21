@@ -14,9 +14,7 @@ use crate::cli::{Confirmation, Global};
 #[derive(Debug, Parser)]
 #[command(
     name = "sync",
-    visible_aliases = ["sy", "up"],
-    about = "Sync packages",
-    long_about = "Sync package selections with candidates from the highest priority repository"
+    about = "Sync package selections with candidates from the highest priority repository [aliases: sy, up]"
 )]
 pub struct Command {
     /// Update repositories before syncing
