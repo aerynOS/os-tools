@@ -75,9 +75,13 @@ impl Registry {
         self.query(move |plugin| plugin.query_keyword(keyword, flags))
     }
 
-    /// Return a sorted stream of `package::Name` for packages whose name starts with `prefix`
-    pub fn by_prefix<'a>(&'a self, prefix: &'a str, flags: package::Flags) -> impl Iterator<Item = package::Name> + 'a {
-        self.query(move |plugin| plugin.query_prefix(prefix, flags))
+    /// Return a sorted stream of `(id, name)` for packages whose name starts with `prefix`
+    pub fn package_summaries_by_prefix<'a>(
+        &'a self,
+        prefix: &'a str,
+        flags: package::Flags,
+    ) -> impl Iterator<Item = package::PackageSummary> + 'a {
+        self.query(move |plugin| plugin.package_summaries_by_prefix(prefix, flags))
     }
 
     /// Return a sorted stream of [`Package`] matching the given [`Flags`]

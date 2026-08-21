@@ -76,12 +76,15 @@ impl Cobble {
         })
     }
 
-    pub fn query_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::Name> {
+    pub fn package_summaries_by_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::PackageSummary> {
         if flags.available {
             self.packages
                 .iter()
                 .filter(|(_, state)| state.meta.name.starts_with(prefix))
-                .map(|(_, state)| state.meta.name.clone())
+                .map(|(_, state)| package::PackageSummary {
+                    name: state.meta.name.clone(),
+                    summary: state.meta.summary.clone(),
+                })
                 .collect()
         } else {
             vec![]
