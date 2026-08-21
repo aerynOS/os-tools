@@ -147,7 +147,8 @@ fn resolve_packages(
 
     fn parse_content(env: &stone_script::ScriptEnv, source: &str) -> Result<String, Error> {
         let expr = stone_script::Expr::parse(source)?;
-        Ok(stone_script::eval_to_string(env, &expr)?)
+        let mut ctx = stone_script::ScriptContext::new();
+        Ok(ctx.eval_to_string(env, &expr)?)
     }
 
     let mut packages = BTreeMap::new();
