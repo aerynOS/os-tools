@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 AerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use std::{io, ops::Deref, path::PathBuf};
+use std::{env, io, ops::Deref, path::PathBuf, slice};
 
 use clap::{Args, CommandFactory, Parser};
 use clap_complete::{
@@ -24,6 +24,73 @@ mod search_file;
 mod state;
 mod sync;
 
+pub fn run() -> Result<(), BoxedError> {
+    Command::parse_from(ExpandedArgs::from(env::args())).run()
+}
+
+/// Whether to interactively ask the
+/// user for confirmation or not.
+/// When [Confirmation::DoNotAsk], the operation will continue
+/// without any user interaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Confirmation {
+    Ask,
+    DoNotAsk,
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("cache")]
+    Cache(#[from] cache::Error),
+
+    #[error(transparent)]
+    Client(#[from] client::Error),
+
+    #[error("index")]
+    Index(#[from] client::index::Error),
+
+    #[error(transparent)]
+    Package(#[from] package::Error),
+
+    #[error("repo")]
+    Repo(#[from] repo::Error),
+
+    #[error("search")]
+    Search(#[from] search::Error),
+
+    #[error("search-file")]
+    SearchFile(#[from] search_file::Error),
+
+    #[error("state")]
+    State(#[from] state::Error),
+
+    #[error("installation")]
+    Installation(#[from] installation::Error),
+
+    #[error("I/O error")]
+    Io(#[from] io::Error),
+}
+
+pub struct BoxedError(Box<Error>);
+
+impl<E: std::error::Error> From<E> for BoxedError
+where
+    Error: From<E>,
+{
+    fn from(value: E) -> Self {
+        let error = Error::from(value);
+        Self(Box::new(error))
+    }
+}
+
+impl Deref for BoxedError {
+    type Target = Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Generate the new CLI command structure
 #[derive(Debug, Parser)]
 #[command(
@@ -31,7 +98,7 @@ mod sync;
     propagate_version = true,
     version = tools_buildinfo::get_full_version(),
 )]
-pub struct Command {
+struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,
     #[command(flatten)]
@@ -107,7 +174,7 @@ impl Command {
 
 /// Globally available arguments
 #[derive(Debug, Args)]
-pub struct Global {
+struct Global {
     #[arg(
         short,
         long = "verbose",
@@ -117,7 +184,7 @@ pub struct Global {
         default_value = "false",
         global = true
     )]
-    pub verbose: bool,
+    verbose: bool,
     #[arg(
         short = 'D',
         long = "directory",
@@ -127,9 +194,9 @@ pub struct Global {
         default_value = "/",
         global = true
     )]
-    pub root_dir: Option<PathBuf>,
+    root_dir: Option<PathBuf>,
     #[arg(long, help = "Cache directory", global = true, help_heading = "Global Options")]
-    pub cache_dir: Option<PathBuf>,
+    cache_dir: Option<PathBuf>,
     #[arg(
         long,
         global = true,
@@ -146,7 +213,7 @@ pub struct Global {
         help = "Assume yes for all questions",
         help_heading = "Global Options",
     )]
-    pub confirm: Confirmation,
+    confirm: Confirmation,
     #[arg(
         short = 'V',
         long = "version",
@@ -176,14 +243,57 @@ pub struct Global {
     generate_completions: Option<String>,
 }
 
-/// Whether to interactively ask the
-/// user for confirmation or not.
-/// When [Confirmation::DoNotAsk], the operation will continue
-/// without any user interaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Confirmation {
-    Ask,
-    DoNotAsk,
+/// Iterator that wraps [std::env::Args] to translate command aliases
+/// into their expanded form.
+/// If no command alias was used, this iterator yields equally to [std::env::Args].
+///
+/// This is needed because clap [doesn't support](https://github.com/clap-rs/clap/discussions/3672)
+/// "application-level" aliases à la Git.
+struct ExpandedArgs {
+    args: env::Args,
+    expansion: Option<slice::Iter<'static, &'static str>>,
+}
+
+impl From<env::Args> for ExpandedArgs {
+    fn from(args: env::Args) -> Self {
+        Self { args, expansion: None }
+    }
+}
+
+impl Iterator for ExpandedArgs {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(exp) = &mut self.expansion {
+            return exp.next().map_or_else(|| self.args.next(), |arg| Some(arg.to_string()));
+        }
+        match self.args.next() {
+            Some(arg) if arg.starts_with('-') => Some(arg),
+            Some(arg) => {
+                let Ok(index) = Self::ALIASES.binary_search_by_key(&arg.as_str(), |&(alias, _)| alias) else {
+                    return Some(arg);
+                };
+                self.expansion = Some(Self::ALIASES[index].1.iter());
+                self.expansion.as_mut().unwrap().next().map(|arg| arg.to_string())
+            }
+            None => None,
+        }
+    }
+}
+
+impl ExpandedArgs {
+    // Keep this list sorted for the binary search.
+    // Ideally we would sort this list at compile time,
+    // but there's no such feature at the moment.
+    const ALIASES: &[(&str, &[&str])] = &[
+        ("pad", &["package", "add"]),
+        ("pex", &["package", "extract"]),
+        ("pfe", &["package", "fetch"]),
+        ("pif", &["package", "info"]),
+        ("pin", &["package", "inspect"]),
+        ("pls", &["package", "list"]),
+        ("prm", &["package", "remove"]),
+    ];
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -234,59 +344,6 @@ fn print_system_model_warning(installation: &Installation, first_line_only: bool
   by doing a `moss sync`.
 - To disable the system-model, remove or rename {path:?}.",
         );
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("cache")]
-    Cache(#[from] cache::Error),
-
-    #[error(transparent)]
-    Client(#[from] client::Error),
-
-    #[error("index")]
-    Index(#[from] client::index::Error),
-
-    #[error(transparent)]
-    Package(#[from] package::Error),
-
-    #[error("repo")]
-    Repo(#[from] repo::Error),
-
-    #[error("search")]
-    Search(#[from] search::Error),
-
-    #[error("search-file")]
-    SearchFile(#[from] search_file::Error),
-
-    #[error("state")]
-    State(#[from] state::Error),
-
-    #[error("installation")]
-    Installation(#[from] installation::Error),
-
-    #[error("I/O error")]
-    Io(#[from] io::Error),
-}
-
-pub struct BoxedError(Box<Error>);
-
-impl<E: std::error::Error> From<E> for BoxedError
-where
-    Error: From<E>,
-{
-    fn from(value: E) -> Self {
-        let error = Error::from(value);
-        Self(Box::new(error))
-    }
-}
-
-impl Deref for BoxedError {
-    type Target = Error;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
