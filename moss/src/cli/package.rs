@@ -63,7 +63,7 @@ pub enum Error {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    #[command(visible_alias("pfe"), about = "Fetch package stone(s) by name or provider")]
+    #[command(about = "Fetch package stone(s) by name or provider [aliases: pfe]")]
     Fetch {
         /// directory to write the fetched stone(s)
         #[arg(short, long, default_value = ".")]
@@ -75,27 +75,20 @@ enum Subcommand {
     },
 
     #[command(
-        visible_alias("pad"),
-        about = "Add package(s) to the implicit system-model from a file path or by name in the repo"
+        about = "Add package(s) to the implicit system-model from a file path or by name in the repo [aliases: pad]"
     )]
     Add(AddArgs),
 
-    #[command(visible_alias("pif"), about = "Show information about the package provider")]
+    #[command(about = "Show information about the package provider [aliases: pif]")]
     Info(InfoArgs),
 
-    #[command(
-        visible_alias = "pin",
-        about = "Show detailed (debug) information on a local `.stone` file"
-    )]
+    #[command(about = "Show detailed (debug) information on a local `.stone` file [aliases: pin]")]
     Inspect(InspectArgs),
 
-    #[command(
-        visible_alias("pls"),
-        about = "List all installed packages according to the resolution of the system-model"
-    )]
+    #[command(about = "List all installed packages according to the resolution of the system-model [aliases: pls]")]
     List(ListArgs),
 
-    #[command(visible_alias = "pex", about = "Extract contents of Stone archive(s) to disk")]
+    #[command(about = "Extract contents of Stone archive(s) to disk [aliases: pex]")]
     Extract {
         #[arg(help = "valid moss-format archives(s) to extract")]
         files: Vec<PathBuf>,
@@ -108,7 +101,7 @@ enum Subcommand {
         output_dir: PathBuf,
     },
 
-    #[command(visible_alias("prm"), about = "Removes package(s) from the implicit system-model")]
+    #[command(about = "Removes package(s) from the implicit system-model [aliases: prm]")]
     Remove(RemoveArgs),
 }
 

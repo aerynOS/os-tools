@@ -16,8 +16,7 @@ use tui::pretty::{ColumnDisplay, print_columns};
 #[derive(Debug, Parser)]
 #[command(
     name = "search",
-    visible_alias = "sr",
-    about = "Search providers (including packages) by name and summary"
+    about = "Search providers (including packages) by name and summary [aliases: sr]"
 )]
 pub struct Command {
     #[arg(help = "Keyword to search for in package names and summaries")]

@@ -52,25 +52,25 @@ pub enum Error {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    #[command(visible_alias("rad"))]
+    #[command(about = "Add a new repository [aliases: rad]")]
     Add(AddArgs),
 
-    #[command(visible_alias("rls"), about = "List system software repositories")]
+    #[command(about = "List system software repositories [aliases: rls]")]
     List,
 
-    #[command(visible_alias("rrm"), about = "Remove a repository for the system")]
+    #[command(about = "Remove a repository for the system [aliases: rrm]")]
     Remove { name: String },
 
-    #[command(visible_alias("rup"), about = "Update the system repositories")]
+    #[command(about = "Update the system repositories [aliases: rup]")]
     Update {
         #[arg(help = "Repository to update. If not provided, all will be updated")]
         name: Option<String>,
     },
 
-    #[command(visible_alias("ren"), about = "Enable a system repository")]
+    #[command(about = "Enable a system repository [aliases: ren]")]
     Enable { name: String },
 
-    #[command(visible_alias("rdi"), about = "Disable a system repository")]
+    #[command(about = "Disable a system repository [aliases: rdi]")]
     Disable { name: String },
 }
 

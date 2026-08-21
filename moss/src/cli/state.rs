@@ -64,25 +64,25 @@ pub enum Error {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    #[command(visible_alias("sac"), about = "Activate the given valid state")]
+    #[command(about = "Activate the given valid state [aliases: sac]")]
     Activate(ActivateArgs),
 
-    #[command(visible_alias("stl"), about = "List all states")]
+    #[command(about = "List all states [aliases: stl]")]
     List(ListArgs),
 
-    #[command(visible_alias = "sts")]
+    #[command(about = "Search a state [aliases: sts]")]
     Search(SearchArgs),
 
-    #[command(visible_alias = "sti", about = "Show information about a state")]
+    #[command(about = "Show information about a state [aliases: sti]")]
     Info {
         #[arg(help = "State ID. If \"active\" is passed, show the currently active state")]
         id: String,
     },
 
-    #[command(visible_alias("sve"), about = "Verify and fix system states and assets")]
+    #[command(about = "Verify and fix system states and assets [aliases: sve]")]
     Verify,
 
-    #[command(visible_alias("ste"), about = "Export a state as a system-model.kdl file")]
+    #[command(about = "Export a state as a system-model.kdl file [aliases: ste]")]
     Export {
         /// State id to export or current state if omitted.
         id: Option<i32>,
@@ -95,10 +95,7 @@ enum Subcommand {
         output: Option<Option<PathBuf>>,
     },
 
-    #[command(
-        visible_alias("srm"),
-        about = "Remove arbitrary states. Supports single states and inclusive ranges a-b"
-    )]
+    #[command(about = "Remove arbitrary states. Supports single states and inclusive ranges a-b [aliases: srm]")]
     Remove(RemoveArgs),
 
     // For profiling only, hence hidden.
