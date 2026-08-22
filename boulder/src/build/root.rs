@@ -29,7 +29,7 @@ pub fn populate(
     let installation = Installation::open(&builder.env.moss_dir, None)?;
     let mut moss_client = moss::Client::builder("boulder", installation)
         .repositories(repositories)
-        .ephemeral(rootfs)
+        .ephemeral(rootfs, moss::fstree::Format::Native)
         .build()?;
 
     if update_repos {

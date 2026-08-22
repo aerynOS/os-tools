@@ -34,6 +34,15 @@ pub struct Command {
     /// This operation won't be captured as a new state
     #[arg(value_name = "dir", long = "to")]
     blit_target: Option<PathBuf>,
+
+    /// Fstree format used when `--to` is supplied
+    #[arg(
+        value_name = "format",
+        long = "to-format",
+        default_value = "native",
+        requires("blit_target")
+    )]
+    blit_target_format: super::FstreeFormatArg,
 }
 
 /// Handle execution of `moss install`
@@ -50,7 +59,7 @@ pub fn handle(args: &ArgMatches, installation: Installation) -> Result<(), Error
 
     // Make ephemeral if a blit target was provided
     if let Some(blit_target) = command.blit_target {
-        client = client.ephemeral(blit_target)?;
+        client = client.ephemeral(blit_target, command.blit_target_format.into())?;
     }
 
     client.install(&pkgs, yes, simulate)?;
