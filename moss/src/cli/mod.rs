@@ -99,6 +99,7 @@ impl Deref for BoxedError {
 /// Generate the new CLI command structure
 #[derive(Debug, Parser)]
 #[command(
+    disable_help_subcommand = true,
     disable_version_flag = true,
     propagate_version = true,
     allow_external_subcommands = true,
