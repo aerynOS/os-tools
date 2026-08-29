@@ -4,9 +4,9 @@
 use moss::{Client, Installation, environment, package::Flags};
 use tui::Styled;
 
-use crate::cli::package::{self, ListArgs};
+use crate::cli::pkg::{self, ListArgs};
 
-pub fn list(args: ListArgs, installation: Installation) -> Result<(), package::Error> {
+pub fn list(args: ListArgs, installation: Installation) -> Result<(), pkg::Error> {
     if !args.repositories.is_empty() {
         unimplemented!("--repositories not yet supported")
     }
@@ -33,7 +33,7 @@ pub fn list(args: ListArgs, installation: Installation) -> Result<(), package::E
     };
 
     if pkgs.is_empty() {
-        return Err(package::Error::NoneFound);
+        return Err(pkg::Error::NoneFound);
     }
 
     // map to renderable state
