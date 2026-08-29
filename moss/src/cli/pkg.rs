@@ -19,10 +19,7 @@ mod list;
 use crate::cli::{Confirmation, Global};
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "package",
-    about = "Manage installed packages and get info on available packages"
-)]
+#[command(about = "Manage installed packages and get info on available packages")]
 pub struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,
@@ -82,7 +79,7 @@ enum Subcommand {
     #[command(about = "Show information about the package provider [aliases: pif]")]
     Info(InfoArgs),
 
-    #[command(about = "Show detailed (debug) information on a local `.stone` file [aliases: pin]")]
+    #[command(about = "Show detailed (debug) information on a local `.stone` file [aliases: pit]")]
     Inspect(InspectArgs),
 
     #[command(about = "List all installed packages according to the resolution of the system-model [aliases: pls]")]

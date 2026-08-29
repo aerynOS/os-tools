@@ -22,7 +22,7 @@ use tui::Styled;
 mod boot;
 mod cache;
 mod index;
-mod package;
+mod pkg;
 mod repo;
 mod search;
 mod search_file;
@@ -55,7 +55,7 @@ pub enum Error {
     Index(#[from] client::index::Error),
 
     #[error(transparent)]
-    Package(#[from] package::Error),
+    Package(#[from] pkg::Error),
 
     #[error("repo")]
     Repo(#[from] repo::Error),
@@ -96,7 +96,6 @@ impl Deref for BoxedError {
     }
 }
 
-/// Generate the new CLI command structure
 #[derive(Debug, Parser)]
 #[command(
     disable_help_subcommand = true,
@@ -104,6 +103,7 @@ impl Deref for BoxedError {
     propagate_version = true,
     allow_external_subcommands = true,
     version = tools_buildinfo::get_full_version(),
+    about = "aerynOS' package manager"
 )]
 struct Command {
     #[command(subcommand)]
@@ -207,7 +207,7 @@ impl Command {
             Subcommand::Boot(cmd) => cmd.handle(installation)?,
             Subcommand::Cache(cmd) => cmd.handle(installation)?,
             Subcommand::Index(cmd) => cmd.handle()?,
-            Subcommand::Package(cmd) => cmd.handle(self.global, installation)?,
+            Subcommand::Pkg(cmd) => cmd.handle(self.global, installation)?,
             Subcommand::Repo(cmd) => cmd.handle(installation)?,
             Subcommand::Search(cmd) => cmd.handle(installation)?,
             Subcommand::SearchFile(cmd) => cmd.handle(installation)?,
@@ -224,13 +224,13 @@ impl Command {
     // Ideally we would sort this list at compile time,
     // but there's no such feature at the moment.
     const ALIASES: &[(&str, &[&str])] = &[
-        ("pad", &["package", "add"]),
-        ("pex", &["package", "extract"]),
-        ("pfe", &["package", "fetch"]),
-        ("pif", &["package", "info"]),
-        ("pin", &["package", "inspect"]),
-        ("pls", &["package", "list"]),
-        ("prm", &["package", "remove"]),
+        ("pad", &["pkg", "add"]),
+        ("pex", &["pkg", "extract"]),
+        ("pfe", &["pkg", "fetch"]),
+        ("pif", &["pkg", "info"]),
+        ("pit", &["pkg", "inspect"]),
+        ("pls", &["pkg", "list"]),
+        ("prm", &["pkg", "remove"]),
         ("rad", &["repo", "add"]),
         ("rdi", &["repo", "disable"]),
         ("ren", &["repo", "enable"]),
@@ -327,7 +327,9 @@ enum Subcommand {
     Boot(boot::Command),
     Cache(cache::Command),
     Index(index::Command),
-    Package(package::Command),
+    #[command(name = "pkg", alias = "package")]
+    Pkg(pkg::Command),
+    #[command(name = "repo", alias = "repository")]
     Repo(repo::Command),
     Search(search::Command),
     SearchFile(search_file::Command),
@@ -396,7 +398,7 @@ mod tests {
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
-        assert!(matches!(command.subcommand, super::Subcommand::Package(_)));
+        assert!(matches!(command.subcommand, super::Subcommand::Pkg(_)));
     }
 
     #[test]
@@ -405,7 +407,7 @@ mod tests {
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
-        assert!(matches!(command.subcommand, super::Subcommand::Package(_)));
+        assert!(matches!(command.subcommand, super::Subcommand::Pkg(_)));
     }
 
     #[test]
@@ -414,6 +416,6 @@ mod tests {
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
-        assert!(matches!(command.subcommand, super::Subcommand::Package(_)));
+        assert!(matches!(command.subcommand, super::Subcommand::Pkg(_)));
     }
 }

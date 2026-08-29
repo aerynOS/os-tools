@@ -6,7 +6,7 @@ use std::io::{Read, Seek, sink};
 use std::path::PathBuf;
 use stone::{StoneDecodedPayload, StonePayloadLayoutFile, StonePayloadMetaPrimitive, StonePayloadMetaTag};
 
-use crate::cli::package::{Error, InspectArgs};
+use crate::cli::pkg::{Error, InspectArgs};
 
 /// Inspect the given .stone files and print results
 pub fn inspect(args: InspectArgs) -> Result<(), Error> {

@@ -11,10 +11,7 @@ use tui::Styled;
 use url::Url;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "repo",
-    about = "Manage the available software repositories visible to the installed system"
-)]
+#[command(about = "Manage the available software repositories visible to the installed system")]
 pub struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,

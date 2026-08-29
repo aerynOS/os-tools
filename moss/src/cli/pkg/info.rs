@@ -7,7 +7,7 @@ use stone::StonePayloadLayoutFile;
 use tui::{Styled, TermSize};
 use vfs::tree::BlitFile;
 
-use crate::cli::package::{Error, InfoArgs};
+use crate::cli::pkg::{Error, InfoArgs};
 
 /// For all arguments, try to match a package
 pub fn info(args: InfoArgs, installation: Installation) -> Result<(), Error> {
