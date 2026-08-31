@@ -1866,7 +1866,6 @@ dependencies = [
  "cbindgen",
  "libc",
  "stone",
- "strum",
 ]
 
 [[package]]
@@ -1994,7 +1993,6 @@ dependencies = [
  "arc-swap",
  "astr",
  "blsforme",
- "bytes",
  "camino",
  "chrono",
  "clap",
@@ -2021,7 +2019,6 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2",
  "similar",
  "snafu",
@@ -2033,7 +2030,6 @@ dependencies = [
  "tokio-util",
  "tools_buildinfo",
  "tracing",
- "tracing-subscriber",
  "tracing_common",
  "triggers",
  "tui",
@@ -3067,7 +3063,6 @@ name = "stone_recipe"
 version = "0.26.10"
 dependencies = [
  "kdl",
- "nom",
  "serde",
  "serde_yaml",
  "snafu",
