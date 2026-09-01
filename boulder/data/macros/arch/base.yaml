@@ -16,6 +16,9 @@ definitions:
     - workdir               : "%(_workdir)"
     - compiler_cache        : "%(_compiler_cache)"
     - scompiler_cache       : "%(_scompiler_cache)"
+    - compiler_lto_cache    : "%(_compiler_lto_cache)"
+    - ltoincremental        : "%(_ltoincremental)"
+    - rustltoincremental    : "%(_rustltoincremental)"
     - sourcedateepoch       : "%(_sourcedateepoch)"
     - compiler_go_cache     : "%(_compiler_go_cache)"
     - compiler_go_mod_cache : "%(_compiler_go_mod_cache)"
@@ -103,6 +106,7 @@ definitions:
     - cargocachedir  : "%(compiler_cargo_cache)"
     - zigcachedir    : "%(compiler_zig_cache)"
     - sccachedir     : "%(scompiler_cache)"
+    - ltocachedir    : "%(compiler_lto_cache)"
     - pkgconfigpath  : "%(libdir)/pkgconfig:/usr/share/pkgconfig"
 
 actions              :
@@ -568,10 +572,10 @@ flags               :
     - lto-full:
         rust      : "-C lto=fat -C linker-plugin-lto -C embed-bitcode=yes"
         gnu:
-            c         : "-flto=%(jobs) -flto-partition=one"
-            cxx       : "-flto=%(jobs) -flto-partition=one"
-            f         : "-flto=%(jobs) -flto-partition=one"
-            ld        : "-flto=%(jobs) -flto-partition=one"
+            c         : "-flto=%(jobs) -flto-partition=one %(ltoincremental)"
+            cxx       : "-flto=%(jobs) -flto-partition=one %(ltoincremental)"
+            f         : "-flto=%(jobs) -flto-partition=one %(ltoincremental)"
+            ld        : "-flto=%(jobs) -flto-partition=one %(ltoincremental)"
         llvm:
             c         : "-flto=full"
             cxx       : "-flto=full"
@@ -581,18 +585,18 @@ flags               :
 
     # Enable Thin-LTO optimisations (ON)
     - lto-thin:
-        rust      : "-C lto=thin -C linker-plugin-lto -C embed-bitcode=yes"
+        rust      : "-C lto=thin -C linker-plugin-lto -C embed-bitcode=yes %(rustltoincremental)"
         gnu:
-            c         : "-flto=%(jobs)"
-            cxx       : "-flto=%(jobs)"
-            f         : "-flto=%(jobs)"
-            ld        : "-flto=%(jobs)"
+            c         : "-flto=%(jobs) %(ltoincremental)"
+            cxx       : "-flto=%(jobs) %(ltoincremental)"
+            f         : "-flto=%(jobs) %(ltoincremental)"
+            ld        : "-flto=%(jobs) %(ltoincremental)"
         llvm:
             c         : "-flto=thin"
             cxx       : "-flto=thin"
             f         : "-flto=thin"
             d         : "-flto=thin"
-            ld        : "-flto=thin"
+            ld        : "-flto=thin %(ltoincremental)"
 
     # Enable LTOextra optimisations (OFF)
     - ltoextra-full:
