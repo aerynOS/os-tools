@@ -142,12 +142,27 @@ impl Phase {
             env.add_builtin_string("compiler_cargo_cache", "/mason/cargocache");
             env.add_builtin_string("compiler_zig_cache", "/mason/zigcache");
             env.add_builtin_string("rustc_wrapper", "/usr/bin/sccache");
+            env.add_builtin_string("compiler_lto_cache", "/mason/ltocache");
+            env.add_builtin(
+                "ltoincremental",
+                stone_script::Expr::parse(match recipe.parsed.options.toolchain {
+                    Toolchain::Llvm => "-Wl,--thinlto-cache-dir=%(ltocachedir)",
+                    Toolchain::Gnu => "-flto-incremental=%(ltocachedir)",
+                })?,
+            );
+            env.add_builtin(
+                "rustltoincremental",
+                stone_script::Expr::parse("-C link-args=-Wl,--thinlto-cache-dir=%(ltocachedir)")?,
+            );
         } else {
             env.add_builtin_string("compiler_go_cache", "");
             env.add_builtin_string("compiler_go_mod_cache", "");
             env.add_builtin_string("compiler_cargo_cache", "");
             env.add_builtin_string("compiler_zig_cache", "");
             env.add_builtin_string("rustc_wrapper", "");
+            env.add_builtin_string("compiler_lto_cache", "");
+            env.add_builtin_string("ltoincremental", "");
+            env.add_builtin_string("rustltoincremental", "");
         }
 
         /* Set the relevant compilers */

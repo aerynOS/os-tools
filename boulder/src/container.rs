@@ -26,6 +26,7 @@ where
     let cargocache = paths.cargocache();
     let zigcache = paths.zigcache();
     let rustc_wrapper = paths.sccache();
+    let ltocache = paths.ltocache();
     let recipe = paths.recipe();
     let ccache_conf = paths.ccache_config();
 
@@ -42,6 +43,7 @@ where
         .bind_rw(&cargocache.host, &cargocache.guest)
         .bind_rw(&zigcache.host, &zigcache.guest)
         .bind_rw(&rustc_wrapper.host, &rustc_wrapper.guest)
+        .bind_rw(&ltocache.host, &ltocache.guest)
         .bind_ro(&recipe.host, &recipe.guest)
         .bind_ro_if_exists(&ccache_conf.host, &ccache_conf.guest);
 
