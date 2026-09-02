@@ -61,6 +61,7 @@ impl Paths {
         util::ensure_dir_exists(&job.cargocache().host)?;
         util::ensure_dir_exists(&job.zigcache().host)?;
         util::ensure_dir_exists(&job.sccache().host)?;
+        util::ensure_dir_exists(&job.ltocache().host)?;
         util::ensure_dir_exists(&job.upstreams().host)?;
 
         Ok(job)
@@ -134,6 +135,13 @@ impl Paths {
         Mapping {
             host: self.host_root.join("sccache"),
             guest: self.guest_root.join("sccache"),
+        }
+    }
+
+    pub fn ltocache(&self) -> Mapping {
+        Mapping {
+            host: self.host_root.join("ltocache"),
+            guest: self.guest_root.join("ltocache"),
         }
     }
 
