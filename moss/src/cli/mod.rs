@@ -8,19 +8,14 @@ use std::{
     path::PathBuf,
 };
 
-use clap::{Args, CommandFactory, Parser};
-use clap_complete::{
-    generate_to,
-    shells::{Bash, Fish, Zsh},
-};
-use clap_mangen::Man;
-use fs_err::{self as fs, File};
+use clap::{Args, Parser};
 use moss::{Installation, client, installation};
 use thiserror::Error;
 use tui::Styled;
 
 mod boot;
 mod cache;
+mod completions;
 mod index;
 mod pkg;
 mod repo;
@@ -155,40 +150,6 @@ impl Command {
 
     /// Run the CLI according to users' flags and arguments.
     pub fn run(self) -> Result<(), BoxedError> {
-        if let Some(dir) = self.global.generate_manpages {
-            fs::create_dir_all(&dir)?;
-            let main_cmd = Command::command();
-            // Generate man page for the main command
-            let main_man = Man::new(main_cmd.clone());
-            let mut buffer = File::create(dir.join("moss.1"))?;
-            main_man.render(&mut buffer)?;
-
-            // Generate man pages for all subcommands
-            for sub in main_cmd.get_subcommands() {
-                let sub_man = Man::new(sub.clone());
-                let name = format!("moss-{}.1", sub.get_name());
-                let mut buffer = File::create(dir.join(&name))?;
-                sub_man.render(&mut buffer)?;
-
-                for nested in sub.get_subcommands() {
-                    let nested_man = Man::new(nested.clone());
-                    let name = format!("moss-{}-{}.1", sub.get_name(), nested.get_name());
-                    let mut buffer = File::create(dir.join(&name))?;
-                    nested_man.render(&mut buffer)?;
-                }
-            }
-            return Ok(());
-        }
-
-        if let Some(dir) = self.global.generate_completions {
-            fs::create_dir_all(&dir)?;
-            let mut cmd = Command::command();
-            generate_to(Bash, &mut cmd, "moss", &dir)?;
-            generate_to(Fish, &mut cmd, "moss", &dir)?;
-            generate_to(Zsh, &mut cmd, "moss", &dir)?;
-            return Ok(());
-        }
-
         // The default is "/" in the absence of an explicit arg.
         let installation = Installation::open(
             self.global.root_dir.clone().unwrap_or_default(),
@@ -206,6 +167,7 @@ impl Command {
         match self.subcommand {
             Subcommand::Boot(cmd) => cmd.handle(installation)?,
             Subcommand::Cache(cmd) => cmd.handle(installation)?,
+            Subcommand::Completions(cmd) => cmd.handle()?,
             Subcommand::Index(cmd) => cmd.handle()?,
             Subcommand::Pkg(cmd) => cmd.handle(self.global, installation)?,
             Subcommand::Repo(cmd) => cmd.handle(installation)?,
@@ -302,30 +264,13 @@ struct Global {
         help = "Print version and exit"
     )]
     version: Option<bool>,
-    #[arg(
-        long = "generate-manpages",
-        global = true,
-        help = "Generate man pages in specified directory",
-        help_heading = "Global Options",
-        value_name = "DIR",
-        hide = true
-    )]
-    generate_manpages: Option<PathBuf>,
-    #[arg(
-        long = "generate-completions",
-        global = true,
-        help = "Generate shell completions in specified directory",
-        help_heading = "Global Options",
-        value_name = "DIR",
-        hide = true
-    )]
-    generate_completions: Option<String>,
 }
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
     Boot(boot::Command),
     Cache(cache::Command),
+    Completions(completions::Command),
     Index(index::Command),
     #[command(name = "pkg", alias = "package")]
     Pkg(pkg::Command),
