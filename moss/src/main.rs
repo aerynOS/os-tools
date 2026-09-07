@@ -11,7 +11,7 @@ mod cli;
 
 /// Main entry point
 fn main() {
-    if let Err(error) = cli::process() {
+    if let Err(error) = cli::run() {
         if let Some(error) = error_needs_manual_handling(&error) {
             match error {
                 ManuallyHandledError::UnsupportedRepos(_) => todo!("handle unsupported repo format"),
@@ -20,7 +20,7 @@ fn main() {
                 }
             }
         } else {
-            report_error(error);
+            report_error(&error);
         }
 
         std::process::exit(1);
@@ -28,8 +28,8 @@ fn main() {
 }
 
 /// Report an execution error to the user
-fn report_error(error: cli::Error) {
-    let sources = sources(&error);
+fn report_error(error: &cli::Error) {
+    let sources = sources(error);
     let error = sources.join(": ");
     error!(error, "Command execution failed");
     println!("{}: {error}", "Error".red());
