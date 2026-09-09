@@ -18,17 +18,20 @@ use url::Url;
 
 use crate::{environment, util::Sha256Wrapper};
 
-/// Shared client for tcp socket reuse and connection limit
-static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-
-fn get_client() -> &'static reqwest::Client {
-    CLIENT.get_or_init(|| {
-        reqwest::ClientBuilder::new()
-            .referer(false)
-            .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .expect("build reqwest client")
-    })
+fn client() -> Result<&'static reqwest::Client, Error> {
+    /// Shared client for TCP socket reuse and connection limit.
+    static CLIENT: OnceLock<Result<reqwest::Client, reqwest::Error>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::ClientBuilder::new()
+                .referer(false)
+                .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+                .build()
+        })
+        .as_ref()
+        // reqwest::Error does not implement Clone,
+        // so we have to convert it to a String.
+        .map_err(|e| Error::Client(e.to_string()))
 }
 
 /// Downloads a file to the provided path
@@ -113,7 +116,7 @@ async fn fetch(url: Url) -> Result<Box<dyn AsyncRead + Unpin + Send>, Error> {
 
 /// Internal fetch helper (sanity control) for `get`
 async fn http_get(url: Url) -> Result<impl AsyncRead + Unpin, Error> {
-    let response = get_client().get(url).send().await?.error_for_status()?;
+    let response = client()?.get(url).send().await?.error_for_status()?;
 
     let stream = response.bytes_stream().map_err(io::Error::other);
     // Convert the stream into an AsyncReader. This chunks the stream
@@ -123,6 +126,8 @@ async fn http_get(url: Url) -> Result<impl AsyncRead + Unpin, Error> {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("failed to initialize HTTP client: {0}")]
+    Client(String),
     #[error("fetch")]
     Fetch(#[from] reqwest::Error),
     #[error("io")]
