@@ -11,7 +11,7 @@
 use std::{
     borrow::Borrow,
     io,
-    os::unix::fs::symlink,
+    os::{fd::AsRawFd, unix::fs::symlink},
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -22,12 +22,12 @@ use itertools::Itertools;
 use nix::{
     NixPath,
     errno::Errno,
-    libc::{AT_FDCWD, RENAME_EXCHANGE, SYS_renameat2, syscall},
+    libc::{AT_FDCWD, RENAME_EXCHANGE, SYS_renameat2, c_ulong, ioctl, syscall},
 };
 use postblit::TriggerScope;
 use stone::{StoneDecodedPayload, StonePayloadLayoutRecord};
 use thiserror::Error;
-use tracing::{info, info_span};
+use tracing::{info, info_span, warn};
 use tui::{MultiProgress, ProgressBar, ProgressStyle, Styled};
 
 use self::install::install;
@@ -594,6 +594,15 @@ impl Client {
         // Now swap staging with live
         atomic_swap(&usr_source, &usr_target).map_err(Error::AtomicSwap)?;
 
+        // The swap moved the previous live tree onto `usr_source`. Revoke any
+        // fsnotify watches held on it so existing watchers re-resolve onto the
+        // freshly promoted `/usr` rather than the now-stale inodes. This must
+        // not fail the promotion: the swap has already happened, so we degrade
+        // to a warning (e.g. on kernels without the FS_IOC_REVOKE_WATCHES patch).
+        if let Err(error) = revoke_watches(&usr_source) {
+            warn!(%error, "Failed to revoke inode watches on replaced /usr");
+        }
+
         Ok(())
     }
 
@@ -979,6 +988,22 @@ fn atomic_swap<A: ?Sized + NixPath, B: ?Sized + NixPath>(old_path: &A, new_path:
     Errno::result(result).map(drop)
 }
 
+/// `FS_IOC_REVOKE_WATCHES`, defined as `_IO(0x15, 3)` by the local (not yet
+/// upstream) fsnotify patch that allows revoking watchers on a subtree.
+const FS_IOC_REVOKE_WATCHES: c_ulong = 0x1503;
+
+/// Revoke all fsnotify (inotify/fanotify) watches at or below `root`.
+///
+/// Sends `FS_UNMOUNT` to every watched inode in the subtree and drops the
+/// marks, forcing watchers to re-resolve their paths. Requires `CAP_SYS_ADMIN`
+/// and a kernel carrying the `FS_IOC_REVOKE_WATCHES` patch; on kernels without
+/// it the ioctl fails with `ENOTTY`.
+fn revoke_watches(root: &Path) -> Result<(), Error> {
+    let file = fs::File::open(root)?;
+    let result = unsafe { ioctl(file.as_raw_fd(), FS_IOC_REVOKE_WATCHES) };
+    Errno::result(result).map(drop).map_err(Error::RevokeWatches)
+}
+
 fn record_state_id(root: &Path, state: state::Id) -> Result<(), Error> {
     let usr = root.join("usr");
     fs::create_dir_all(&usr)?;
@@ -1172,4 +1197,6 @@ pub enum Error {
     BuildVfsTree(#[source] vfs::tree::Error),
     #[error("atomic swap")]
     AtomicSwap(#[source] Errno),
+    #[error("revoke inode watches")]
+    RevokeWatches(#[source] Errno),
 }
