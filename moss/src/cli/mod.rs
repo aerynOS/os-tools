@@ -3,14 +3,14 @@
 
 use std::{env, io, path::Path, path::PathBuf};
 
-use clap::{Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, ValueEnum};
 use clap_complete::{
     generate_to,
     shells::{Bash, Fish, Zsh},
 };
 use clap_mangen::Man;
 use fs_err as fs;
-use moss::{Installation, installation};
+use moss::{Installation, fstree, installation};
 use thiserror::Error;
 use tracing_common::{self, logging::LogConfig, logging::init_log_with_config};
 use tui::Styled;
@@ -341,4 +341,19 @@ pub enum Error {
 
     #[error("I/O error")]
     Io(#[from] io::Error),
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum FstreeFormatArg {
+    Native,
+    Overlayimg,
+}
+
+impl From<FstreeFormatArg> for fstree::Format {
+    fn from(value: FstreeFormatArg) -> Self {
+        match value {
+            FstreeFormatArg::Native => fstree::Format::Native,
+            FstreeFormatArg::Overlayimg => fstree::Format::Overlayimg,
+        }
+    }
 }

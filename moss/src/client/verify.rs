@@ -20,7 +20,7 @@ use vfs::tree::BlitFile;
 use crate::{
     Client, Package, Signal,
     client::{self, cache},
-    package, runtime, signal, state,
+    fstree, package, runtime, signal, state,
 };
 
 #[allow(clippy::branches_sharing_code)]
@@ -135,7 +135,17 @@ pub fn verify(client: &Client, yes: bool, verbose: bool) -> Result<(), client::E
         let base = if is_active {
             client.installation.root.join("usr")
         } else {
-            client.installation.root_path(state.id.to_string()).join("usr")
+            let fstree = client.open_archived_state(&state.id)?;
+
+            match fstree.format() {
+                fstree::Format::Native => fstree.path.join("usr"),
+                // TODO: Do we need to verify anything? These are immutable images
+                // to the backing CAS which is already validated.
+                fstree::Format::Overlayimg => {
+                    mpb.suspend(|| println!(" {} skipping overlayimg state #{}", "×".yellow(), state.id));
+                    return Ok(acc);
+                }
+            }
         };
 
         let vfs = client.vfs(state.selections.iter().map(|s| &s.package))?;
@@ -295,39 +305,55 @@ pub fn verify(client: &Client, yes: bool, verbose: bool) -> Result<(), client::E
 
         let is_active = client.installation.active_state == Some(state.id);
 
-        // Blits to staging dir
-        let fstree = client.blit_root(state.selections.iter().map(|s| &s.package))?;
+        // Blits to staged fstree
+        let mut root = client.blit_root(state.selections.iter().map(|s| &s.package))?;
 
         if is_active {
             let system_model =
                 client.load_or_create_system_model(client.installation.root.join("usr/lib/system-model.kdl"), state)?;
 
-            // Override install root with the newly blitted active state
-            client.apply_stateful_blit(fstree, state, None, system_model)?;
+            // Override install root with the newly blitted active fstree
+            client.apply_stateful_blit(&mut root, state, None, system_model)?;
             // Remove corrupt (swapped) state from staging directory
             fs::remove_dir_all(client.installation.staging_dir())?;
         } else {
-            let system_model = client.load_or_create_system_model(
-                client
-                    .installation
-                    .root_path(state.id.to_string())
-                    .join("usr/lib/system-model.kdl"),
-                state,
-            )?;
-
+            root.fstree.bring_up(fstree::Mutability::ReadWrite)?;
+            let system_model =
+                client.load_or_create_system_model(root.fstree.path.join("usr/lib/system-model.kdl"), state)?;
             // Use the staged blit as an ephereral target for the non-active state
             // then archive it to it's archive directory
-            client::record_state_id(&client.installation.staging_dir(), state.id)?;
-            client.apply_ephemeral_blit(fstree, &client.installation.staging_dir(), system_model)?;
+            client::record_state_id(&root.fstree.path, state.id)?;
+            root.fstree.bring_down()?;
 
+            client.apply_ephemeral_blit(&mut root, system_model)?;
+
+            let archive_path = client.state_archive_path(root.fstree.format(), &state.id);
             // Remove the old archive state so the new blit can be archived
-            fs::remove_dir_all(client.installation.root_path(state.id.to_string())).or_else(|e| {
+            fs::remove_dir_all(&archive_path).or_else(|e| {
                 if e.kind() == io::ErrorKind::NotFound {
                     Ok(())
                 } else {
                     Err(e)
                 }
             })?;
+
+            // TODO: This is super hacky & a code smell, we really
+            // need to rework the "orchestration" layer of how
+            // blit, apply / promote / activate work w/ the new
+            // fstree API
+            match root.fstree.format() {
+                // `archive_state` expects that `promote_staging`
+                // was called first & promote staging already
+                // archives this overlayimg state. Since that wasn't
+                // called, we need to do it manually here.
+                fstree::Format::Overlayimg => {
+                    root.fstree.bring_down()?;
+                    root.fstree.move_to(&archive_path)?;
+                }
+                fstree::Format::Native => {}
+            }
+
+            // New staged state can now be "archived"
             client.archive_state(state.id)?;
             // Cleanup staging dir used as ephemeral blit target now that we've
             // archived out of it
