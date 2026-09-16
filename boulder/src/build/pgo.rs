@@ -7,19 +7,24 @@ use crate::architecture::BuildTarget;
 use crate::recipe::Recipe;
 
 pub fn stages(recipe: &Recipe, target: BuildTarget) -> Option<Vec<Stage>> {
-    let build = recipe.build_target_definition(target);
+    let root_build = &recipe.parsed.build;
+    let target_build = recipe.build_target_definition(target);
 
-    build.workload.is_some().then(|| {
-        let mut stages = vec![Stage::One];
+    target_build
+        .workload
+        .as_ref()
+        .or(root_build.workload.as_ref())
+        .map(|_| {
+            let mut stages = vec![Stage::One];
 
-        if matches!(recipe.parsed.options.toolchain, Toolchain::Llvm) && recipe.parsed.options.cspgo {
-            stages.push(Stage::Two);
-        }
+            if matches!(recipe.parsed.options.toolchain, Toolchain::Llvm) && recipe.parsed.options.cspgo {
+                stages.push(Stage::Two);
+            }
 
-        stages.push(Stage::Use);
+            stages.push(Stage::Use);
 
-        stages
-    })
+            stages
+        })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::Display)]
