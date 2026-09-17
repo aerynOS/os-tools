@@ -4,11 +4,14 @@
 use std::path::PathBuf;
 
 use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser};
+use clap_complete::ArgValueCompleter;
 
+use moss::completions::prefix_completer;
 use moss::{Installation, client::Client, environment};
 use tracing::instrument;
 
 pub use moss::client::Error;
+use moss::package;
 
 pub fn command() -> clap::Command {
     Command::command()
@@ -23,6 +26,7 @@ pub fn command() -> clap::Command {
 )]
 pub struct Command {
     /// Packages to install
+    #[arg(add=ArgValueCompleter::new(prefix_completer(package::Flags::default().with_available())))]
     packages: Vec<String>,
 
     /// Simulate the operation (dry-run)
