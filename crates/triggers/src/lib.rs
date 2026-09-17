@@ -65,7 +65,7 @@ impl<'a> Collection<'a> {
         let results = paths.into_iter().flat_map(|p| {
             self.handlers
                 .iter()
-                .filter_map(move |h| h.pattern.match_path(&p).map(|m| (h.id, h.handler.compiled(&m))))
+                .filter_map(move |h| h.pattern.matches(&p).map(|m| (h.id, h.handler.compiled(&m))))
         });
 
         for (id, handler) in results {

@@ -46,10 +46,6 @@ pub enum Error {
     #[error("os_release")]
     OsRelease(#[from] os_release::Error),
 
-    /// fnmatch pattern compilation for boot, etc.
-    #[error("fnmatch pattern")]
-    Pattern(#[from] fnmatch::Error),
-
     #[error("incomplete kernel tree")]
     IncompleteKernel(String),
 }
@@ -77,13 +73,13 @@ fn kernel_files_from_state<'a>(
 
     for (_, path) in layouts.iter() {
         match &path.file {
-            StonePayloadLayoutFile::Regular(_, target) if pattern.match_path(target).is_some() => {
+            StonePayloadLayoutFile::Regular(_, target) if pattern.matches(target).is_some() => {
                 kernel_entries.push(KernelCandidate {
                     path: PathBuf::from("usr").join(target),
                     _layout: path.to_owned(),
                 });
             }
-            StonePayloadLayoutFile::Symlink(_, target) if pattern.match_path(target).is_some() => {
+            StonePayloadLayoutFile::Symlink(_, target) if pattern.matches(target).is_some() => {
                 kernel_entries.push(KernelCandidate {
                     path: PathBuf::from("usr").join(target),
                     _layout: path.to_owned(),
@@ -106,7 +102,7 @@ fn boot_files_from_new_state<'a>(
 
     for (_, path) in layouts.iter() {
         if let StonePayloadLayoutFile::Regular(_, target) = &path.file
-            && pattern.match_path(target).is_some()
+            && pattern.matches(target).is_some()
         {
             rets.push(install.root.join("usr").join(target));
         }
@@ -177,8 +173,8 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
 
     // For the new/active state
     let head_layouts = layouts_for_state(client, state)?;
-    let kernel_pattern = Pattern::from_str("lib/kernel/(version:*)/*")?;
-    let systemd = Pattern::from_str("lib*/systemd/boot/efi/*.efi")?;
+    let kernel_pattern = Pattern::from("lib/kernel/(version:*)/*");
+    let systemd = Pattern::from("lib*/systemd/boot/efi/*.efi");
     let booty_bits = boot_files_from_new_state(&client.installation, &head_layouts, &systemd);
 
     let mut all_states = states_except_new(client, state)?;
