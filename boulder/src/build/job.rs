@@ -95,6 +95,10 @@ fn work_dir(build_dir: &Path, upstreams: &[Upstream]) -> PathBuf {
     work_dir
 }
 
+pub fn pgo_dir(build_dir: &Path) -> PathBuf {
+    PathBuf::from(format!("{}-pgo", build_dir.display()))
+}
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("missing arch macros: {0}")]

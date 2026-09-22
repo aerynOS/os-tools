@@ -13,7 +13,7 @@ use crate::build::pgo;
 use crate::build::script::ScriptBundle;
 use crate::{Macros, Paths, Recipe, architecture::BuildTarget};
 
-use super::{Error, work_dir};
+use super::{Error, pgo_dir, work_dir};
 
 pub fn list(pgo_stage: Option<pgo::Stage>) -> Vec<Phase> {
     if matches!(pgo_stage, Some(pgo::Stage::One | pgo::Stage::Two)) {
@@ -216,7 +216,7 @@ impl Phase {
             env.add_builtin_string("pgo_stage", "NONE");
         }
 
-        env.add_builtin_string("pgo_dir", format!("{}-pgo", build_dir.display()));
+        env.add_builtin_string("pgo_dir", pgo_dir(&build_dir).display());
 
         add_tuning(target, pgo_stage, recipe, macros, &mut env)?;
 
