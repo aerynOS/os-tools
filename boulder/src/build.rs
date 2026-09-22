@@ -19,7 +19,7 @@ use nix::{
 use thiserror::Error;
 use tui::Styled;
 
-use self::job::Job;
+use self::job::{Job, pgo_dir};
 use crate::{
     Env, Macros, Paths, Recipe, Timing,
     architecture::BuildTarget,
@@ -196,16 +196,16 @@ impl Builder {
         for (i, target) in self.targets.iter().enumerate() {
             println!("{}", build_target_prefix(target.build_target, i));
 
+            // Clean out any pre-existing profiling data from PGO runs
+            if let Some(job) = target.jobs.iter().find(|job| job.pgo_stage.is_some()) {
+                util::recreate_dir(&pgo_dir(&job.build_dir))?;
+            }
+
             for (i, job) in target.jobs.iter().enumerate() {
                 let is_pgo = job.pgo_stage.is_some();
 
                 // Recreate work dir for each job
                 util::recreate_dir(&job.work_dir)?;
-                // Ensure pgo dir exists
-                if is_pgo {
-                    let pgo_dir = PathBuf::from(format!("{}-pgo", job.build_dir.display()));
-                    util::ensure_dir_exists(&pgo_dir)?;
-                }
 
                 if let Some(stage) = job.pgo_stage {
                     println!("{}", pgo_stage_prefix(stage, i));
