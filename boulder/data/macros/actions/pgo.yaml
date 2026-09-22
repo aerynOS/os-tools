@@ -103,10 +103,10 @@ flags               :
     # PGO stage1 flags for ProfileStage1 (workload builds only)
     - pgostage1:
         llvm:
-            c         : "-fprofile-generate=%(pgo_dir)/IR"
-            cxx       : "-fprofile-generate=%(pgo_dir)/IR"
-            ld        : "-fprofile-generate=%(pgo_dir)/IR"
-            rust      : "-Cprofile-generate=%(pgo_dir)/IR -C link-arg=-fprofile-generate=/mason/build/x86_64-pgo/IR"
+            c         : "-fprofile-generate=%(pgo_dir)/IR/%%p.profraw"
+            cxx       : "-fprofile-generate=%(pgo_dir)/IR/%%p.profraw"
+            ld        : "-fprofile-generate=%(pgo_dir)/IR/%%p.profraw"
+            rust      : "-Cprofile-generate=%(pgo_dir)/IR/%%p.profraw -C link-arg=-fprofile-generate=%(pgo_dir)/%%p.profraw"
         gnu:
             c         : "-fprofile-generate -fprofile-dir=%(pgo_dir)"
             cxx       : "-fprofile-generate -fprofile-dir=%(pgo_dir)"
@@ -115,9 +115,9 @@ flags               :
     # PGO stage2 flags for ProfileStage2 (workload builds only)
     - pgostage2:
         llvm:
-            c         : "-fprofile-use=%(pgo_dir)/ir.profdata -fcs-profile-generate=%(pgo_dir)/CS"
-            cxx       : "-fprofile-use=%(pgo_dir)/ir.profdata -fcs-profile-generate=%(pgo_dir)/CS"
-            ld        : "-fprofile-use=%(pgo_dir)/ir.profdata -fcs-profile-generate=%(pgo_dir)/CS"
+            c         : "-fprofile-use=%(pgo_dir)/ir.profdata -fcs-profile-generate=%(pgo_dir)/CS/%%p.profraw"
+            cxx       : "-fprofile-use=%(pgo_dir)/ir.profdata -fcs-profile-generate=%(pgo_dir)/CS/%%p.profraw"
+            ld        : "-fprofile-use=%(pgo_dir)/ir.profdata -fcs-profile-generate=%(pgo_dir)/CS/%%p.profraw"
 
     # PGO final flags for ProfileUse (workload builds only)
     - pgouse:
