@@ -31,7 +31,7 @@ pub fn stages(recipe: &Recipe, target: BuildTarget) -> Option<Vec<Stage>> {
 pub enum Stage {
     #[strum(serialize = "stage1")]
     One,
-    #[strum(serialize = "stage1")]
+    #[strum(serialize = "stage2")]
     Two,
     #[strum(serialize = "use")]
     Use,
