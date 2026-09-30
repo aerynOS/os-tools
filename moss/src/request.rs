@@ -16,7 +16,7 @@ use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 use url::Url;
 
-use crate::{environment, util::Sha256Wrapper};
+use crate::{environment, runtime, util::Sha256Wrapper};
 
 fn client() -> Result<&'static reqwest::Client, Error> {
     /// Shared client for TCP socket reuse and connection limit.
@@ -43,13 +43,8 @@ pub async fn download(url: Url, to: &Path) -> Result<(), Error> {
 
 /// Downloads the supplied resource as JSON and decodes it into the return type
 pub async fn download_json<T: DeserializeOwned>(url: Url) -> Result<T, Error> {
-    let mut reader = fetch(url).await?;
-
-    let mut bytes = vec![];
-
-    reader.read_to_end(&mut bytes).await?;
-
-    Ok(serde_json::from_slice(&bytes)?)
+    let reader = SyncRead::new(fetch(url).await?);
+    Ok(serde_json::from_reader(reader)?)
 }
 
 /// Downloads a file to the provided path & returns it's sha256 hash
@@ -185,5 +180,22 @@ where
             delta,
         });
         result
+    }
+}
+
+/// Converts a [tokio::io::AsyncRead] into an [std::io::Read].
+struct SyncRead<R: AsyncRead + Unpin> {
+    reader: R,
+}
+
+impl<R: AsyncRead + Unpin> SyncRead<R> {
+    fn new(reader: R) -> Self {
+        Self { reader }
+    }
+}
+
+impl<R: AsyncRead + Unpin> io::Read for SyncRead<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        runtime::block_on(self.reader.read(buf))
     }
 }
