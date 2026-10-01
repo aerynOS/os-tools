@@ -16,12 +16,13 @@ use std::ffi::OsStr;
 use std::path::{self, Path, PathBuf};
 use std::process::Stdio;
 
+use crate::error::InnerError;
 use tokio::{io, process};
 use url::Url;
 
-pub mod error;
-pub use self::error::Error;
-use error::{Constraint, InnerError};
+mod error;
+
+pub use crate::error::{Constraint, Error};
 
 /// An uninitialized repository, useful for unit tests.
 pub fn null_repository() -> Repository {
@@ -90,7 +91,7 @@ impl Repository {
         Ok(Self { path })
     }
 
-    /// Whether this repository has a commit identified by its hash.
+    /// Returns whether this repository has a commit identified by its hash.
     pub async fn has_commit(&self, commit: &str) -> Result<bool, Error> {
         let output = run_git(&[
             OsStr::new("-C"),
@@ -117,7 +118,7 @@ impl Repository {
         Ok(str::from_utf8(output.stdout.trim_ascii_end()).unwrap_or("").to_owned())
     }
 
-    /// Returns the remote URL for the provided `remote`
+    /// Returns the URL of `remote`.
     pub async fn get_remote_url(&self, remote: &str) -> Result<String, Error> {
         let output = run_git(&[
             OsStr::new("-C"),
@@ -130,7 +131,7 @@ impl Repository {
         Ok(str::from_utf8(&output.stdout).unwrap_or("").to_owned())
     }
 
-    /// Sets the remote URL for the provided `remote` to `url`
+    /// Sets the URL of `remote` to `url`.
     pub async fn set_remote_url(&self, remote: &str, url: &str) -> Result<(), Error> {
         run_git(&[
             OsStr::new("-C"),
@@ -144,7 +145,7 @@ impl Repository {
         Ok(())
     }
 
-    /// Checkout the provided `rev` (branch or commit)
+    /// Performs `git checkout` passing the provided `rev` (branch or commit).
     pub async fn checkout(&self, rev: &str) -> Result<(), Error> {
         run_git(&[
             OsStr::new("-C"),
@@ -156,7 +157,7 @@ impl Repository {
         Ok(())
     }
 
-    /// Equivalent to `git fetch`.
+    /// Fetches the repository. It's equivalent to `git fetch`.
     /// A callback is fired repeatedly to track the fetching
     /// process in real time.
     pub async fn fetch_progress<F>(&self, callback: F) -> Result<(), Error>
@@ -176,17 +177,23 @@ impl Repository {
         Ok(())
     }
 
-    /// Clone the current [`Repository`] to the provided `path` and return
-    /// the cloned to [`Repository`].
+    /// Clones the current [Repository] to the provided `path` and
+    /// returns the new [Repository]. The new one won't be a mirror, thus
+    /// it will have a main working tree (in layman terms, source files are
+    /// "extracted").
+    ///
+    /// Careful: cloning a [Repository] while it's being modified is racy.
+    /// Do not modify the original [Repository] during the entire operation.
     pub async fn clone_to(&self, path: &Path) -> Result<Self, Error> {
         let path = path::absolute(path).map_err(InnerError::from)?;
 
-        // Clone it to `path`
+        // Clone it to `path`.
         run_git(&[OsStr::new("clone"), self.path.as_os_str(), path.as_os_str()]).await?;
 
         Ok(Self { path: path.to_owned() })
     }
 
+    /// Returns the path of this repository.
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -197,11 +204,11 @@ impl Repository {
 pub struct FetchProgress {
     /// Completion percentage.
     pub percent: u8,
-    /// Download speed in formatted human units per second
+    /// Download speed in formatted human units per second.
     pub speed: String,
 }
 
-/// Runs git and waits for it to terminate.
+/// Runs Git and waits for it to terminate.
 async fn run_git<I, S>(args: I) -> Result<std::process::Output, Error>
 where
     I: IntoIterator<Item = S>,
