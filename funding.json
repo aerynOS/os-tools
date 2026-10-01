@@ -7,7 +7,7 @@
     "name": "aerynOS",
     "email": "contact@aerynos.com",
     "phone": "",
-    "description": "aerynOS is an independent Linux distribution that builds modern tooling to simplify creating and managing custom operating systems.",
+    "description": "aerynOS is an independent Linux distribution built with bespoke, modern, and efficient tooling designed to simplify and streamline the package delivery pipeline.",
     "webpageUrl": {
       "url": "https://github.com/aerynos"
     }
@@ -47,9 +47,9 @@
       {
         "guid": "monthly-funding",
         "status": "active",
-        "name": "Monthly developer funding",
-        "description": "Fund full time development and hosting costs monthly",
-        "amount": 3500,
+        "name": "Monthly operations funding",
+        "description": "Fund hosting and build farm hardware costs monthly",
+        "amount": 400,
         "currency": "EUR",
         "frequency": "monthly",
         "channels": [
