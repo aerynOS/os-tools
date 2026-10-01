@@ -1,12 +1,13 @@
 {
-  "version": "v1.0.0",
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
   "entity": {
     "type": "organisation",
     "role": "owner",
-    "name": "AerynOS",
-    "email": "ikey@aerynos.com",
+    "name": "aerynOS",
+    "email": "contact@aerynos.com",
     "phone": "",
-    "description": "The AerynOS Linux distribution - a bold, independent project creating a new set of tooling to solve the problem of creating and managing distributions, effectively.",
+    "description": "aerynOS is an independent Linux distribution that builds modern tooling to simplify creating and managing custom operating systems.",
     "webpageUrl": {
       "url": "https://github.com/aerynos"
     }
@@ -15,7 +16,7 @@
     {
       "guid": "moss-and-boulder",
       "name": "tools",
-      "description": "AerynOS package management tooling: moss and boulder",
+      "description": "aerynOS package management tooling: moss and boulder",
       "webpageUrl": {
         "url": "https://github.com/aerynos/os-tools"
       },
@@ -36,15 +37,9 @@
   "funding": {
     "channels": [
       {
-        "guid": "github-sponsors",
-        "type": "payment-provider",
-        "address": "https://github.com/sponsors/ikeycode",
-        "description": "GitHub sponsors"
-      },
-      {
         "guid": "kofi",
         "type": "payment-provider",
-        "address": "https://ko-fi.com/AerynOS",
+        "address": "https://ko-fi.com/aerynOS",
         "description": "Ko-fi subscriptions/one-time-payments/etc"
       }
     ],
@@ -54,11 +49,10 @@
         "status": "active",
         "name": "Monthly developer funding",
         "description": "Fund full time development and hosting costs monthly",
-        "amount": 3000,
-        "currency": "GBP",
+        "amount": 3500,
+        "currency": "EUR",
         "frequency": "monthly",
         "channels": [
-          "github-sponsors",
           "kofi"
         ]
       }
