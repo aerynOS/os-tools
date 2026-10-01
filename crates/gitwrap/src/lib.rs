@@ -60,7 +60,6 @@ impl Repository {
         run_git(&[
             OsStr::new("clone"),
             OsStr::new("--mirror"),
-            OsStr::new("--recurse-submodules"),
             OsStr::new(&url.as_str()),
             path.as_os_str(),
         ])
@@ -81,7 +80,6 @@ impl Repository {
             &[
                 OsStr::new("clone"),
                 OsStr::new("--mirror"),
-                OsStr::new("--recurse-submodules"),
                 OsStr::new("--progress"),
                 OsStr::new(&url.as_str()),
                 path.as_os_str(),
@@ -152,7 +150,6 @@ impl Repository {
             OsStr::new("-C"),
             self.path.as_os_str(),
             OsStr::new("checkout"),
-            OsStr::new("--recurse-submodules"),
             OsStr::new(rev),
         ])
         .await?;
@@ -171,7 +168,6 @@ impl Repository {
                 OsStr::new("-C"),
                 self.path.as_os_str(),
                 OsStr::new("fetch"),
-                OsStr::new("--recurse-submodules"),
                 OsStr::new("--progress"),
             ],
             callback,
@@ -186,13 +182,7 @@ impl Repository {
         let path = path::absolute(path).map_err(InnerError::from)?;
 
         // Clone it to `path`
-        run_git(&[
-            OsStr::new("clone"),
-            OsStr::new("--recurse-submodules"),
-            self.path.as_os_str(),
-            path.as_os_str(),
-        ])
-        .await?;
+        run_git(&[OsStr::new("clone"), self.path.as_os_str(), path.as_os_str()]).await?;
 
         Ok(Self { path: path.to_owned() })
     }
