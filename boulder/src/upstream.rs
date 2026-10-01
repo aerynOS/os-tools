@@ -360,7 +360,7 @@ upstreams:
         let stored = vec![
             Stored::Git(StoredGit {
                 name: "repo1.git".to_owned(),
-                repo: gitwrap::null_repository(),
+                repo: gitwrap::NULL_REPOSITORY,
                 was_cached: false,
                 url: Url::parse("https://github.com/example/repo1.git").unwrap(),
                 original_ref: "main".to_owned(),
@@ -369,7 +369,7 @@ upstreams:
             }),
             Stored::Git(StoredGit {
                 name: "repo2.git".to_owned(),
-                repo: gitwrap::null_repository(),
+                repo: gitwrap::NULL_REPOSITORY,
                 was_cached: false,
                 url: Url::parse("https://github.com/example/repo2.git").unwrap(),
                 original_ref: "main".to_owned(),
@@ -378,7 +378,7 @@ upstreams:
             }),
             Stored::Git(StoredGit {
                 name: "repo3.git".to_owned(),
-                repo: gitwrap::null_repository(),
+                repo: gitwrap::NULL_REPOSITORY,
                 was_cached: false,
                 url: Url::parse("https://github.com/example/repo3.git").unwrap(),
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
@@ -387,7 +387,7 @@ upstreams:
             }),
             Stored::Git(StoredGit {
                 name: "repo4.git".to_owned(),
-                repo: gitwrap::null_repository(),
+                repo: gitwrap::NULL_REPOSITORY,
                 was_cached: false,
                 url: Url::parse("https://github.com/example/repo4.git").unwrap(),
                 original_ref: "abc123d".to_owned(),
@@ -396,7 +396,7 @@ upstreams:
             }),
             Stored::Git(StoredGit {
                 name: "file.tar.gz".to_owned(),
-                repo: gitwrap::null_repository(),
+                repo: gitwrap::NULL_REPOSITORY,
                 was_cached: false,
                 // We don't care about the values below.
                 url: "http://example.com".try_into().unwrap(),
@@ -442,7 +442,7 @@ upstreams:
         let stored = vec![
             Stored::Git(StoredGit {
                 name: "repo3.git".to_owned(),
-                repo: gitwrap::null_repository(),
+                repo: gitwrap::NULL_REPOSITORY,
                 was_cached: false,
                 url: Url::parse("https://github.com/example/repo3.git").unwrap(),
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),

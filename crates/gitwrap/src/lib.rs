@@ -25,9 +25,7 @@ mod error;
 pub use crate::error::{Constraint, Error};
 
 /// An uninitialized repository, useful for unit tests.
-pub fn null_repository() -> Repository {
-    Repository { path: PathBuf::new() }
-}
+pub const NULL_REPOSITORY: Repository = Repository { path: PathBuf::new() };
 
 /// A Git repository.
 pub struct Repository {
