@@ -197,6 +197,26 @@ impl Repository {
         Ok(Self { path: path.to_owned() })
     }
 
+    /// Creates a new Git worktree inside `path`, detaching the head to
+    /// `rev`.
+    ///
+    /// A worktree behaves exactly like a regular repository, so a [Repository] is
+    /// returned on success.
+    pub async fn add_worktree(&self, path: &Path, rev: &str) -> Result<Repository, Error> {
+        run_git(&[
+            OsStr::new("-C"),
+            self.path.as_os_str(),
+            OsStr::new("worktree"),
+            OsStr::new("add"),
+            OsStr::new("--force"),  // Ensure left over worktrees won't block the operation.
+            OsStr::new("--detach"), // Never create a new branch.
+            path.as_os_str(),
+            OsStr::new(rev),
+        ])
+        .await?;
+        Ok(Repository { path: path.to_owned() })
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
