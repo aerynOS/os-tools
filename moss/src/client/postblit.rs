@@ -19,7 +19,10 @@ use thiserror::Error;
 use tracing::{error, warn};
 use triggers::format::{CompiledHandler, Handler, Trigger};
 
-use crate::{Installation, fstree::PendingFile};
+use crate::{
+    Installation,
+    fstree::{self, Fstree, PendingFile},
+};
 
 /// Transaction trigger wrapper
 /// These are loaded from `/usr/share/moss/triggers/tx.d/*.yaml`
@@ -44,13 +47,13 @@ impl config::Config for SystemTrigger {
 }
 
 /// The trigger scope determines the environment that the trigger runs in
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(super) enum TriggerScope<'a> {
     /// A transaction trigger, isolated to `/usr`
     Transaction(&'a Installation, &'a super::Scope),
 
     /// A system trigger with reduced sandboxing, capable of writes outside `/usr`
-    System(&'a Installation, &'a super::Scope),
+    System(&'a Installation, &'a super::Scope, &'a Fstree<'a>),
 }
 
 impl TriggerScope<'_> {
@@ -58,12 +61,12 @@ impl TriggerScope<'_> {
     fn root_dir(&self) -> PathBuf {
         match self {
             TriggerScope::Transaction(install, scope) => match scope {
-                super::Scope::Stateful => install.staging_dir().clone(),
-                super::Scope::Ephemeral { blit_root } => blit_root.clone(),
+                super::Scope::Stateful { .. } => install.staging_dir().clone(),
+                super::Scope::Ephemeral { blit_root, .. } => blit_root.clone(),
             },
-            TriggerScope::System(install, scope) => match scope {
-                super::Scope::Stateful => install.root.clone(),
-                super::Scope::Ephemeral { blit_root } => blit_root.clone(),
+            TriggerScope::System(install, scope, _) => match scope {
+                super::Scope::Stateful { .. } => install.root.clone(),
+                super::Scope::Ephemeral { blit_root, .. } => blit_root.clone(),
             },
         }
     }
@@ -72,12 +75,12 @@ impl TriggerScope<'_> {
     fn host_path(&self, path: impl AsRef<Path>) -> PathBuf {
         match self {
             TriggerScope::Transaction(install, scope) => match scope {
-                super::Scope::Stateful => install.root.join(path),
-                super::Scope::Ephemeral { blit_root } => blit_root.join(path),
+                super::Scope::Stateful { .. } => install.root.join(path),
+                super::Scope::Ephemeral { blit_root, .. } => blit_root.join(path),
             },
-            TriggerScope::System(install, scope) => match scope {
-                super::Scope::Stateful => install.root.join(path),
-                super::Scope::Ephemeral { blit_root } => blit_root.join(path),
+            TriggerScope::System(install, scope, _) => match scope {
+                super::Scope::Stateful { .. } => install.root.join(path),
+                super::Scope::Ephemeral { blit_root, .. } => blit_root.join(path),
             },
         }
     }
@@ -86,19 +89,29 @@ impl TriggerScope<'_> {
     fn guest_path(&self, path: impl AsRef<Path>) -> PathBuf {
         match self {
             TriggerScope::Transaction(install, scope) => match scope {
-                super::Scope::Stateful => install.staging_path(path),
-                super::Scope::Ephemeral { blit_root } => blit_root.join(path),
+                super::Scope::Stateful { .. } => install.staging_path(path),
+                super::Scope::Ephemeral { blit_root, .. } => blit_root.join(path),
             },
-            TriggerScope::System(install, scope) => match scope {
-                super::Scope::Stateful => install.root.join(path),
-                super::Scope::Ephemeral { blit_root } => blit_root.join(path),
+            TriggerScope::System(install, scope, fstree) => match scope {
+                super::Scope::Stateful { .. } => {
+                    // TODO: Cleanup all this resolution stuff, its way too foot-gunny
+                    //
+                    // If we use a container and we're bind mounting usr/ make sure its the
+                    // actual usr/ with mount under it & not system root user which
+                    // is symlinks that wont resolve in the container
+                    if install.root != Path::new("/") && *fstree.format() == fstree::Format::Overlayimg {
+                        fstree.path.join(path)
+                    } else {
+                        install.root.join(path)
+                    }
+                }
+                super::Scope::Ephemeral { blit_root, .. } => blit_root.join(path),
             },
         }
     }
 }
 
 /// Condensed type for loaded triggers with scope and executor
-#[derive(Debug)]
 pub(super) struct TriggerRunner<'a> {
     scope: TriggerScope<'a>,
     trigger: CompiledHandler,
@@ -175,13 +188,14 @@ impl TriggerRunner<'_> {
 
                 Ok(isolation.run(|| execute_trigger_directly(&self.trigger))?)
             }
-            TriggerScope::System(install, _) => {
+            TriggerScope::System(install, _, _) => {
                 // OK, if the root == `/` then we can run directly, otherwise we need to containerise with RW.
                 if install.root.to_string_lossy() == "/" {
                     Ok(execute_trigger_directly(&self.trigger)?)
                 } else {
                     let isolation = Container::new(install.isolation_dir())
                         .networking(false)
+                        // Paths updated by system triggers
                         .bind_rw(self.scope.host_path("etc"), "/etc")
                         .bind_rw(self.scope.guest_path("usr"), "/usr")
                         .work_dir("/");

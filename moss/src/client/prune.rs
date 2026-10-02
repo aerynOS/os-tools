@@ -202,7 +202,7 @@ pub(super) fn prune_states(client: &Client, strategy: Strategy<'_>, yes: bool) -
 
     let archive_paths = removals
         .iter()
-        .map(|s| installation.root_path(s.id.to_string()))
+        .filter_map(|s| Some(client.open_archived_state(&s.id).ok()?.path))
         .collect::<Vec<_>>();
 
     info!(

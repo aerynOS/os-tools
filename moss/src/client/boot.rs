@@ -22,7 +22,12 @@ use itertools::Itertools;
 use stone::{StonePayloadLayoutFile, StonePayloadLayoutRecord};
 use thiserror::{self, Error};
 
-use crate::{Installation, State, db, package::Id};
+use crate::{
+    Installation, State, db,
+    fstree::{self, Fstree},
+    package::Id,
+    state,
+};
 
 use super::Client;
 
@@ -52,6 +57,12 @@ pub enum Error {
 
     #[error("incomplete kernel tree")]
     IncompleteKernel(String),
+
+    #[error("failed to find archived fstree for state {0}")]
+    NoArchivedState(state::Id),
+
+    #[error("fstree")]
+    Fstree(#[from] fstree::DriverError),
 }
 
 /// Simple mapping type for kernel discovery paths, retaining the layout reference
@@ -121,7 +132,7 @@ fn layouts_for_state(client: &Client, state: &State) -> Result<Vec<(Id, StonePay
 }
 
 /// Return an additional 4 older states excluding the current state
-fn states_except_new(client: &Client, state: &State) -> Result<Vec<State>, db::Error> {
+fn states_except_new<'a>(client: &'a Client, state: &State) -> Result<Vec<StateEntry<'a>>, Error> {
     let states = client
         .state_db
         .list_ids()?
@@ -138,8 +149,14 @@ fn states_except_new(client: &Client, state: &State) -> Result<Vec<State>, db::E
         .rev()
         .take(4)
         .rev()
-        .filter_map(|(id, _)| client.state_db.get(id).ok())
-        .collect::<Vec<_>>();
+        .map(|(id, _)| {
+            let state = client.state_db.get(id)?;
+            let fstree = client
+                .open_archived_state(&state.id)
+                .map_err(|_| Error::NoArchivedState(id))?;
+            Ok(StateEntry::Archived { state, fstree })
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
     Ok(states)
 }
 
@@ -181,36 +198,43 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
     let systemd = Pattern::from_str("lib*/systemd/boot/efi/*.efi")?;
     let booty_bits = boot_files_from_new_state(&client.installation, &head_layouts, &systemd);
 
-    let mut all_states = states_except_new(client, state)?;
-
     // no fun times without a bootloder
     if booty_bits.is_empty() {
         return Ok(());
+    }
+
+    let mut all_states = states_except_new(client, state)?;
+    all_states.push(StateEntry::Active(state.clone()));
+
+    // Ensure all archived fstree are brought up so we can read from them
+    for entry in all_states.iter_mut() {
+        if let StateEntry::Archived { fstree, .. } = entry {
+            fstree.bring_up(fstree::Mutability::ReadOnly)?;
+        }
     }
 
     let global_schema = os_schema_for_root(&root)?;
 
     // Grab the entries for the new state
     let mut all_kernels = vec![];
-    all_states.push(state.clone());
     for state in all_states.iter() {
-        let layouts = layouts_for_state(client, state)?;
+        let layouts = layouts_for_state(client, state.state())?;
         let local_kernels = kernel_files_from_state(&layouts, &kernel_pattern);
         let mapped = global_schema.discover_system_kernels(local_kernels.into_iter())?;
-        all_kernels.push((mapped, state.id));
+        all_kernels.push((mapped, state));
     }
 
     // pipe all of our entries into blsforme
     let entries = all_kernels
         .iter()
-        .flat_map(|&(ref kernels, state_id)| {
+        .flat_map(|&(ref kernels, state_entry)| {
             let rootref = &root;
             let configref = &config;
             kernels.iter().filter_map(move |k| {
-                let sysroot = if state.id == state_id {
-                    rootref.clone()
-                } else {
-                    client.installation.root_path(state_id.to_string()).to_owned()
+                let state_id = state_entry.state().id;
+                let sysroot = match state_entry {
+                    StateEntry::Active(_) => rootref.clone(),
+                    StateEntry::Archived { fstree, .. } => fstree.path.clone(),
                 };
 
                 if !sysroot.exists() {
@@ -248,6 +272,13 @@ pub fn synchronize(client: &Client, state: &State) -> Result<(), Error> {
         manager.sync(&global_schema)?;
     } else {
         manager.sync(&global_schema)?;
+    }
+
+    // And finally bring all archived states back down
+    for entry in all_states.iter_mut() {
+        if let StateEntry::Archived { fstree, .. } = entry {
+            fstree.bring_down()?;
+        }
     }
 
     Ok(())
@@ -290,4 +321,18 @@ pub fn print_status(installation: &Installation) -> Result<(), Error> {
     println!("Global cmdline : {:?}", manager.global_cmdline());
 
     Ok(())
+}
+
+enum StateEntry<'a> {
+    Active(State),
+    Archived { state: State, fstree: Fstree<'a> },
+}
+
+impl StateEntry<'_> {
+    fn state(&self) -> &State {
+        match self {
+            StateEntry::Active(state) => state,
+            StateEntry::Archived { state, .. } => state,
+        }
+    }
 }
