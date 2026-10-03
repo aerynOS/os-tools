@@ -176,7 +176,6 @@ actions              :
 
 defaultTuningGroups :
     - asneeded
-    - avxwidth
     - base
     - bindnow
     - build-id
@@ -748,7 +747,7 @@ flags               :
             c         : "-fno-direct-access-external-data"
             cxx       : "-fno-direct-access-external-data"
 
-    # Prefer 128-bit vector width (ON)
+    # Prefer 128-bit vector width (OFF)
     - avxwidth-128:
         c         : "-mprefer-vector-width=128"
         cxx       : "-mprefer-vector-width=128"
