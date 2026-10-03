@@ -249,20 +249,22 @@ impl TryFrom<String> for Provider {
 
 /// Parse the [`Kind`] of dependency or provider from the string
 fn parse(s: &str) -> Result<(Kind, String), ParseError> {
-    let (kind, rest) = s.split_once('(').ok_or(ParseError(s.to_owned()))?;
-
-    if !rest.ends_with(')') {
-        return Err(ParseError(s.to_owned()));
-    }
-
-    let kind = kind.parse::<Kind>().map_err(|e| ParseError(e.to_string()))?;
-    // Safe since we checked `ends_with(')')`
-    let name = rest[0..rest.len() - 1].to_string();
+    let (kind, name) = if let Some((kind, rest)) = s.split_once('(') {
+        if !rest.ends_with(')') {
+            return Err(ParseError(s.to_owned()));
+        }
+        let kind = Kind::from_str(kind).map_err(|e| ParseError(e.to_string()))?;
+        // Safe since we checked `ends_with(')')`
+        let name = rest[0..rest.len() - 1].to_string();
+        (kind, name)
+    } else {
+        (Kind::PackageName, s.to_owned())
+    };
 
     Ok((kind, name))
 }
 
 /// Parsing error for dependency and provider APIs
 #[derive(Debug, Error)]
-#[error("Invalid dependency type: {0}")]
+#[error("Invalid dependency format: {0}")]
 pub struct ParseError(String);
