@@ -13,7 +13,7 @@ rust-version = "1.94"
 
 [workspace.dependencies]
 astr.path = "crates/astr"
-blsforme = { git = "https://github.com/AerynOS/blsforme.git", rev = "55da60a60b6f883818fbd67c67557439787f2fce" }
+blsforme = { git = "https://github.com/AerynOS/blsforme.git", rev = "2951cf4d3c56b15ff6ba3638c42abd42ecfffdbd" }
 bytes = "1.6.0"
 camino = "1.1.10"
 chrono = "0.4.38"

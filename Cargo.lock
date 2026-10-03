@@ -261,7 +261,7 @@ dependencies = [
 [[package]]
 name = "blsforme"
 version = "0.1.0"
-source = "git+https://github.com/AerynOS/blsforme.git?rev=55da60a60b6f883818fbd67c67557439787f2fce#55da60a60b6f883818fbd67c67557439787f2fce"
+source = "git+https://github.com/AerynOS/blsforme.git?rev=2951cf4d3c56b15ff6ba3638c42abd42ecfffdbd#2951cf4d3c56b15ff6ba3638c42abd42ecfffdbd"
 dependencies = [
  "blake3",
  "fs-err",
@@ -3404,7 +3404,7 @@ dependencies = [
 [[package]]
 name = "topology"
 version = "0.1.0"
-source = "git+https://github.com/AerynOS/blsforme.git?rev=55da60a60b6f883818fbd67c67557439787f2fce#55da60a60b6f883818fbd67c67557439787f2fce"
+source = "git+https://github.com/AerynOS/blsforme.git?rev=2951cf4d3c56b15ff6ba3638c42abd42ecfffdbd#2951cf4d3c56b15ff6ba3638c42abd42ecfffdbd"
 dependencies = [
  "fs-err",
  "gpt",
