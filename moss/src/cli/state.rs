@@ -36,6 +36,7 @@ impl Command {
     pub fn handle(self, global: Global, installation: Installation) -> Result<(), Error> {
         match self.subcommand {
             Subcommand::Activate(args) => activate(args, installation)?,
+            Subcommand::GetActive => get_active(installation)?,
             Subcommand::List(args) => list(global, args, installation)?,
             Subcommand::Search(args) => search(global, args, installation)?,
             Subcommand::Info { id } => info(id, installation)?,
@@ -66,6 +67,9 @@ pub enum Error {
 enum Subcommand {
     #[command(about = "Activate the given valid state [aliases: sac]")]
     Activate(ActivateArgs),
+
+    #[command(about = "Get the currently active state [aliases: sag]")]
+    GetActive,
 
     #[command(about = "List all states [aliases: stl]")]
     List(ListArgs),
@@ -122,9 +126,6 @@ struct ActivateArgs {
 struct ListArgs {
     #[arg(short = 's', long = "sync", help = "Reduce the output to synced states")]
     filter_synced: bool,
-
-    #[arg(short = 'a', long = "activate", help = "Reduce the output to activated states")]
-    filter_activated: bool,
 
     #[arg(short = 'r', long = "remove", help = "Reduce the output to removed states")]
     filter_removed: bool,
@@ -206,9 +207,19 @@ fn activate(args: ActivateArgs, installation: Installation) -> Result<(), Error>
     Ok(())
 }
 
+fn get_active(installation: Installation) -> Result<(), Error> {
+    let client = Client::new(environment::NAME, installation)?;
+    if let Some(state) = client.get_active_state()? {
+        println!("{}", state.id);
+    } else {
+        eprintln!("No active state");
+    }
+    Ok(())
+}
+
 /// List all known states, newest first
 fn list(global: Global, args: ListArgs, installation: Installation) -> Result<(), Error> {
-    if args.filter_activated || args.filter_synced || args.filter_removed {
+    if args.filter_synced || args.filter_removed {
         unimplemented!("Filtered arguments not yet implemented");
     }
 

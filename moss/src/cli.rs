@@ -200,6 +200,7 @@ impl Command {
         ("rrm", &["repo", "remove"]),
         ("rup", &["repo", "update"]),
         ("sac", &["state", "activate"]),
+        ("sag", &["state", "get-active"]),
         ("sf", &["search-file"]),
         ("sr", &["search"]),
         ("srm", &["state", "remove"]),
