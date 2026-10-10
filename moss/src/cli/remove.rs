@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser};
+use clap_complete::ArgValueCompleter;
+
+use moss::completions::prefix_completer;
+use moss::package;
 
 use moss::{Installation, client::Client, environment};
 use tracing::instrument;
@@ -21,6 +25,7 @@ pub fn command() -> clap::Command {
 )]
 pub struct Command {
     /// Packages to remove
+    #[arg(add=ArgValueCompleter::new(prefix_completer(package::Flags::default().with_installed())))]
     packages: Vec<String>,
 
     /// Simulate the operation (dry-run)
