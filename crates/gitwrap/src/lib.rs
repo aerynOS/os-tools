@@ -33,6 +33,12 @@ pub struct Repository {
 }
 
 impl Repository {
+    /// Opens a local Git repository.
+    pub async fn open(path: &Path) -> Result<Self, Error> {
+        let path = path::absolute(path).map_err(InnerError::from)?;
+        Ok(Self { path })
+    }
+
     /// Opens a local bare Git repository.
     /// If the Git repository at `path` is not bare,
     /// an [Error] containing [Constraint::NotBare] is returned.
@@ -214,7 +220,8 @@ impl Repository {
     /// Populate the submodule directories, recursively.
     ///
     /// This only works on a non-bare [Repository], so it must have
-    /// been obtained via [Self::clone_to] or [Self::add_worktree].
+    /// been obtained via [Self::clone_to], or [Self::add_worktree],
+    /// or [Self::open] must have opened a non-bare repository.
     pub async fn populate_submodules(&self) -> Result<(), Error> {
         run_git(&[
             OsStr::new("-C"),
@@ -225,6 +232,24 @@ impl Repository {
             OsStr::new("--recursive"),
         ])
         .await?;
+        Ok(())
+    }
+
+    /// Populate the submodule at `path`. Optionally, a local `reference`
+    /// repository can be provided instead of fetching it remotely.
+    pub async fn populate_submodule(&self, path: &Path, reference: Option<&Path>) -> Result<(), Error> {
+        let mut cmd = vec![
+            OsStr::new("-C"),
+            self.path.as_os_str(),
+            OsStr::new("submodule"),
+            OsStr::new("init"),
+            path.as_os_str(),
+        ];
+        if let Some(reference) = reference {
+            cmd.extend_from_slice(&[OsStr::new("--reference"), reference.as_os_str()]);
+        }
+
+        run_git(&cmd).await?;
         Ok(())
     }
 
