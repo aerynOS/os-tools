@@ -10,7 +10,7 @@ use std::{
 use moss::util;
 use stone_recipe::{
     tuning,
-    upstream::{self, Upstream},
+    upstream::{self, GitDestination, Upstream},
 };
 use thiserror::Error;
 
@@ -64,11 +64,15 @@ impl Job {
 fn work_dir(build_dir: &Path, upstreams: &[Upstream]) -> PathBuf {
     let mut work_dir = build_dir.to_path_buf();
 
-    // Work dir is the first upstream that should be unpacked
-    if let Some(upstream) = upstreams.iter().find(|upstream| match upstream.props {
-        upstream::Props::Plain { unpack, .. } => unpack,
-        upstream::Props::Git { .. } => true,
-    }) {
+    // Work dir is the first upstream that should be unpacked.
+    let first_unpacked = upstreams.iter().find(|upstream| match &upstream.props {
+        upstream::Props::Plain { unpack, .. } => *unpack,
+        // Consider only non-submodule Git upstreams.
+        upstream::Props::Git { dest, .. } => dest
+            .as_ref()
+            .is_none_or(|dest| !matches!(dest, GitDestination::Submodule { .. })),
+    });
+    if let Some(upstream) = first_unpacked {
         match &upstream.props {
             upstream::Props::Plain { rename, unpack_dir, .. } => {
                 let file_name = util::uri_file_name(&upstream.url);
@@ -80,11 +84,16 @@ fn work_dir(build_dir: &Path, upstreams: &[Upstream]) -> PathBuf {
 
                 work_dir = build_dir.join(unpack_dir);
             }
-            upstream::Props::Git { clone_dir, .. } => {
+            upstream::Props::Git { dest, .. } => {
                 let source = util::uri_file_name(&upstream.url);
-                let target = clone_dir
+                let target = dest
                     .as_ref()
-                    .map(|dir| dir.display().to_string())
+                    .and_then(|dest| {
+                        if let GitDestination::Dir(dir) = dest {
+                            return Some(dir.display().to_string());
+                        }
+                        None
+                    })
                     .unwrap_or_else(|| source.to_owned());
 
                 work_dir = build_dir.join(target);

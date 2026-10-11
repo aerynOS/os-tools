@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: 2024 AerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use itertools::Itertools;
+use std::borrow::Cow;
 use std::collections::BTreeSet;
-use stone_recipe::upstream;
+use std::path::Path;
 
+use itertools::Itertools;
 use moss::util;
 use stone_recipe::tuning::{self, Toolchain};
+use stone_recipe::upstream::{self, GitDestination};
 use tui::Styled;
 
 use crate::build::pgo;
@@ -267,18 +269,26 @@ fn prepare_script(upstreams: &[upstream::Upstream]) -> String {
                     r#"bsdtar-static xf "%(sourcedir)/{rename}" -C "{unpack_dir}" --strip-components={strip_dirs} --no-same-owner || (echo "Failed to extract archive"; exit 1);"#,
                 );
             }
-            upstream::Props::Git { clone_dir, .. } => {
+            upstream::Props::Git { dest, .. } => {
                 let source = util::uri_file_name(&upstream.url);
-                let target = clone_dir
+                let target = dest
                     .as_ref()
-                    .map(|dir| dir.display().to_string())
+                    .map(|dest| git_destination_path(dest).display().to_string())
                     .unwrap_or_else(|| source.to_owned());
-
-                let _ = writeln!(&mut content, "mkdir -p {target}");
-                let _ = writeln!(
-                    &mut content,
-                    r#"cp -Ra --no-preserve=ownership "%(sourcedir)/{source}/." "{target}""#,
-                );
+                if let Some(GitDestination::Submodule { parent, path }) = dest {
+                    let _ = writeln!(
+                        &mut content,
+                        r#"git -C {} submodule update --reference %(sourcedir)/{source} {}"#,
+                        parent.display(),
+                        path.display()
+                    );
+                } else {
+                    let _ = writeln!(&mut content, "mkdir -p {target}");
+                    let _ = writeln!(
+                        &mut content,
+                        r#"cp -Ra --no-preserve=ownership "%(sourcedir)/{source}/." "{target}""#,
+                    );
+                }
             }
         }
     }
@@ -428,4 +438,11 @@ fn default_tuning_groups(target: BuildTarget, macros: &Macros) -> &[String] {
     }
 
     &[]
+}
+
+fn git_destination_path<'a>(dest: &'a GitDestination) -> Cow<'a, Path> {
+    match dest {
+        GitDestination::Dir(dir) => Cow::Borrowed(dir.as_path()),
+        GitDestination::Submodule { parent, path } => Cow::Owned(parent.join(path)),
+    }
 }
