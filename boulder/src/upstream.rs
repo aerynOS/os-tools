@@ -18,11 +18,13 @@
 
 use std::{
     io,
+    ops::DerefMut,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use crate::recipe::Recipe;
+use container::Container;
 use fs_err as fs;
 use futures_util::{StreamExt, TryStreamExt, stream};
 use moss::runtime;
@@ -55,15 +57,26 @@ impl Upstream {
     /// in the `upstream` section of a Stone recipe.
     pub fn from_recipe_upstream(upstream: upstream::Upstream, original_index: usize) -> Result<Self, Error> {
         match upstream.props {
-            upstream::Props::Plain { hash, rename, .. } => Ok(Self::Plain(Plain {
+            upstream::Props::Plain {
+                hash,
+                rename,
+                strip_dirs,
+                unpack,
+                unpack_dir,
+            } => Ok(Self::Plain(Plain {
                 url: upstream.url,
                 hash: hash.parse().map_err(plain::Error::from)?,
                 rename,
+                extract: unpack.then(|| plain::ExtractParams {
+                    dir: unpack_dir,
+                    strip_dirs: strip_dirs.unwrap_or(plain::ExtractParams::default().strip_dirs),
+                }),
             })),
-            upstream::Props::Git { git_ref, .. } => Ok(Self::Git(Git {
+            upstream::Props::Git { git_ref, clone_dir } => Ok(Self::Git(Git {
                 url: upstream.url,
                 commit: git_ref,
                 original_index,
+                share_dir: clone_dir,
             })),
         }
     }
@@ -168,10 +181,10 @@ impl Stored {
     ///
     /// This function tries to be as efficient as possible in terms
     /// of actual bytes written/copied, by linking files from the storage directory.
-    pub async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
+    pub async fn share(&self, cont: &mut Container, dest_dir: &Path) -> Result<(), Error> {
         match self {
-            Stored::Plain(plain) => plain.share(dest_dir)?,
-            Stored::Git(git) => git.share(&dest_dir.join(&git.name)).await?,
+            Stored::Plain(plain) => plain.share(cont, dest_dir).await?,
+            Stored::Git(git) => git.share(cont, dest_dir).await?,
         }
         Ok(())
     }
@@ -194,6 +207,7 @@ pub fn sync(
     recipe: &Recipe,
     upstreams: &[Upstream],
     storage_dir: &Path,
+    cont: &mut Container,
     share_dir: &Path,
 ) -> Result<Vec<Stored>, Error> {
     println!();
@@ -209,6 +223,7 @@ pub fn sync(
     );
     tp.tick();
 
+    let cont = tokio::sync::Mutex::new(cont);
     let stored = runtime::block_on(
         stream::iter(upstreams)
             .map(|upstream| async {
@@ -231,7 +246,10 @@ pub fn sync(
                         .tick_chars("--=≡■≡=--"),
                 );
 
-                stored.share(share_dir).await?;
+                {
+                    let mut cont = cont.lock().await;
+                    stored.share(cont.deref_mut(), share_dir).await?;
+                }
 
                 let cached_tag = stored
                     .was_cached()
@@ -374,6 +392,7 @@ upstreams:
                 original_ref: "main".to_owned(),
                 resolved_hash: "1111222233334444555566667777888899990000".to_owned(),
                 original_index: 0,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo2.git".to_owned(),
@@ -383,6 +402,7 @@ upstreams:
                 original_ref: "main".to_owned(),
                 resolved_hash: "aaaa1111bbbb2222cccc3333dddd4444eeee5555".to_owned(),
                 original_index: 1,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo3.git".to_owned(),
@@ -392,6 +412,7 @@ upstreams:
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 resolved_hash: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 original_index: 2,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo4.git".to_owned(),
@@ -401,6 +422,7 @@ upstreams:
                 original_ref: "abc123d".to_owned(),
                 resolved_hash: "abc123d567890abcdef1234567890abcdef12345".to_owned(),
                 original_index: 3,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "file.tar.gz".to_owned(),
@@ -411,6 +433,7 @@ upstreams:
                 original_ref: String::new(),
                 resolved_hash: String::new(),
                 original_index: 0,
+                share_dir: None,
             }),
         ];
 
@@ -456,11 +479,13 @@ upstreams:
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 resolved_hash: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 original_index: 0,
+                share_dir: None,
             }),
             Stored::Plain(StoredPlain {
                 name: "file.tar.gz".to_owned(),
                 path: "/tmp/file.tar.gz".into(),
                 was_cached: false,
+                extract: None,
             }),
         ];
 

@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+use container::Container;
 use fs_err as fs;
 use moss::{request, util};
 use sha2::{Digest, Sha256};
@@ -40,12 +41,14 @@ pub async fn fetch(url: Url, file_path: &Path, pb: &ProgressBar) -> Result<Hash,
 
 /// Extracts the source archive into the destination directory.
 /// The destination directory must exist.
-pub async fn extract(archive_path: &Path, dest_dir: &Path) -> Result<(), Error> {
+pub async fn extract(archive_path: &Path, dest_dir: &Path, strip_dirs: u8) -> Result<(), Error> {
     let output = Command::new("bsdtar")
         .arg("xf")
         .arg(archive_path)
         .arg("-C")
         .arg(dest_dir)
+        .arg("--strip-components")
+        .arg(strip_dirs.to_string())
         .output()
         .await?;
 
@@ -67,6 +70,8 @@ pub struct Plain {
     /// Name of the upstream when stored in the storage
     /// directory. If None, a default name is implied from [Self::url].
     pub rename: Option<String>,
+    /// Whether to extract the source archive into the build directory, or to share it as-is.
+    pub extract: Option<ExtractParams>,
 }
 
 impl Plain {
@@ -115,6 +120,7 @@ impl Plain {
             name: self.name().to_owned(),
             path,
             was_cached: false,
+            extract: self.extract.clone(),
         })
     }
 
@@ -157,6 +163,7 @@ impl Plain {
             name: self.name().to_owned(),
             path,
             was_cached: true,
+            extract: self.extract.clone(),
         })
     }
 
@@ -191,6 +198,8 @@ pub struct StoredPlain {
     pub path: PathBuf,
     /// Whether the source archive was already stored with valid hash.
     pub was_cached: bool,
+    /// Whether the Upstream is meant to be extracted, and with which parameters.
+    pub extract: Option<ExtractParams>,
 }
 
 impl StoredPlain {
@@ -198,15 +207,39 @@ impl StoredPlain {
     ///
     /// This function tries to be as efficient as possible in terms
     /// of actual bytes copied: a hard link is created if possible.
-    pub fn share(&self, dest_dir: &Path) -> Result<(), Error> {
-        let target = dest_dir.join(self.name.clone());
-
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)?;
+    pub async fn share(&self, cont: &mut Container, dest_dir: &Path) -> Result<(), Error> {
+        if let Some(params) = &self.extract {
+            let target = dest_dir.join(params.dir.as_deref().unwrap_or(Path::new(&self.name)));
+            fs::create_dir_all(&target)?;
+            extract(&self.path, &target, params.strip_dirs).await?;
+        } else {
+            let target = dest_dir.join(Path::new(&self.name));
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            cont.bind_ro(self.path.clone(), target);
         }
-        util::hardlink_or_copy(&self.path, &target)?;
 
         Ok(())
+    }
+}
+
+/// Parameters for extracting a source archive.
+#[derive(Clone, Debug)]
+pub struct ExtractParams {
+    /// Directory where the source archive is extracted, relative to
+    /// a destination directory. If None, the directory name is [StoredPlain::name].
+    pub dir: Option<PathBuf>,
+    /// Number of leading directories to strip from the source archive.
+    pub strip_dirs: u8,
+}
+
+impl Default for ExtractParams {
+    fn default() -> Self {
+        Self {
+            dir: Default::default(),
+            strip_dirs: 1,
+        }
     }
 }
 

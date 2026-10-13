@@ -9,6 +9,7 @@ use std::{
     process, thread,
 };
 
+use ::container::Container;
 use fs_err as fs;
 use itertools::Itertools;
 use moss::{repository, util};
@@ -116,7 +117,8 @@ impl Builder {
     }
 
     pub fn setup(
-        &self,
+        &mut self,
+        cont: &mut Container,
         timing: &mut Timing,
         initialize_timer: timing::Timer,
         update_repos: bool,
@@ -147,6 +149,7 @@ impl Builder {
             &self.recipe,
             &self.upstreams,
             &self.paths.upstreams().host,
+            cont,
             &self.paths.guest_host_path(&self.paths.upstreams()),
         )?;
 
