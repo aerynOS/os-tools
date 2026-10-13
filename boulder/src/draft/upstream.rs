@@ -54,7 +54,9 @@ pub fn extract(env: &Env, upstream: &Upstream, extract_root: &Path) -> Result<()
     let upstream_dir = upstream.stored_path(&upstream_container_dir);
     runtime::block_on(async {
         match upstream {
-            Upstream::Plain(_) => plain::extract(&upstream_dir, extract_root).await.map_err(Error::from),
+            Upstream::Plain(_) => plain::extract(&upstream_dir, extract_root, 0)
+                .await
+                .map_err(Error::from),
             Upstream::Git(_) => git::clone_to(&upstream_dir, extract_root)
                 .await
                 .map_err(|e| Error::from(git::Error::Git(e))),
@@ -92,6 +94,7 @@ async fn fetch_archive(uri: &SourceUri, upstreams_dir: &Path, pb: &ProgressBar) 
         url: uri.url.clone(),
         hash,
         rename: None,
+        extract: None,
     };
 
     let final_path = archive.stored_path(upstreams_dir);
@@ -108,6 +111,7 @@ async fn fetch_git_repo(uri: &SourceUri, upstreams_dir: &Path, pb: &ProgressBar)
         url: uri.url.clone(),
         commit: "HEAD".to_owned(),
         original_index: 0,
+        share_dir: None,
     };
     let final_path = git_upstream.stored_path(upstreams_dir);
 

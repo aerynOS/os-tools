@@ -9,6 +9,7 @@ use std::{
     process, thread,
 };
 
+use ::container::Container;
 use fs_err as fs;
 use itertools::Itertools;
 use moss::{repository, util};
@@ -42,6 +43,7 @@ pub struct Builder {
     pub env: Env,
     upstreams: Vec<Upstream>,
     repos: repository::Map,
+    container: Container,
 }
 
 pub struct Target {
@@ -100,6 +102,7 @@ impl Builder {
             env,
             upstreams,
             repos,
+            container: Default::default(),
         })
     }
 
@@ -116,7 +119,7 @@ impl Builder {
     }
 
     pub fn setup(
-        &self,
+        &mut self,
         timing: &mut Timing,
         initialize_timer: timing::Timer,
         update_repos: bool,
@@ -147,6 +150,7 @@ impl Builder {
             &self.recipe,
             &self.upstreams,
             &self.paths.upstreams().host,
+            &mut self.container,
             &self.paths.guest_host_path(&self.paths.upstreams()),
         )?;
 

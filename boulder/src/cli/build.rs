@@ -97,7 +97,7 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
         return Err(Error::VerifyBinaryManifestRequired(path.to_owned()));
     }
 
-    let builder = Builder::new(&recipe_path, verify_against.clone(), env, profile, ccache, output)?;
+    let mut builder = Builder::new(&recipe_path, verify_against.clone(), env, profile, ccache, output)?;
     let pkg_name = format!(
         "{}-{}-{}",
         builder.recipe.parsed.source.name, builder.recipe.parsed.source.version, builder.recipe.parsed.source.release
