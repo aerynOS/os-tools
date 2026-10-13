@@ -61,6 +61,8 @@ pub struct Plain {
     /// Name of the upstream when stored in the storage
     /// directory. If None, a default name is implied from [Self::url].
     pub rename: Option<String>,
+    /// Whether to extract the source archive into the build directory, or to share it as-is.
+    pub share_extracted: bool,
 }
 
 impl Plain {
@@ -109,6 +111,7 @@ impl Plain {
             name: self.name().to_owned(),
             path,
             was_cached: false,
+            share_extracted: self.share_extracted,
         })
     }
 
@@ -151,6 +154,7 @@ impl Plain {
             name: self.name().to_owned(),
             path,
             was_cached: true,
+            share_extracted: self.share_extracted,
         })
     }
 
@@ -185,6 +189,8 @@ pub struct StoredPlain {
     pub path: PathBuf,
     /// Whether the source archive was already stored with valid hash.
     pub was_cached: bool,
+    /// Whether to extract the source archive into the build directory, or to share it as-is.
+    pub share_extracted: bool,
 }
 
 impl StoredPlain {
@@ -192,13 +198,17 @@ impl StoredPlain {
     ///
     /// This function tries to be as efficient as possible in terms
     /// of actual bytes copied: a hard link is created if possible.
-    pub fn share(&self, dest_dir: &Path) -> Result<(), Error> {
+    pub async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
         let target = dest_dir.join(self.name.clone());
 
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        util::hardlink_or_copy(&self.path, &target)?;
+        if self.share_extracted {
+            extract(&self.path, dest_dir).await?;
+        } else {
+            util::hardlink_or_copy(&self.path, &target)?;
+        }
 
         Ok(())
     }

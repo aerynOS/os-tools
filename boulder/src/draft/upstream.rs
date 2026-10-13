@@ -92,6 +92,7 @@ async fn fetch_archive(uri: &SourceUri, upstreams_dir: &Path, pb: &ProgressBar) 
         url: uri.url.clone(),
         hash,
         rename: None,
+        share_extracted: false,
     };
 
     let final_path = archive.stored_path(upstreams_dir);

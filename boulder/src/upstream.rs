@@ -55,10 +55,13 @@ impl Upstream {
     /// in the `upstream` section of a Stone recipe.
     pub fn from_recipe_upstream(upstream: upstream::Upstream, original_index: usize) -> Result<Self, Error> {
         match upstream.props {
-            upstream::Props::Plain { hash, rename, .. } => Ok(Self::Plain(Plain {
+            upstream::Props::Plain {
+                hash, rename, unpack, ..
+            } => Ok(Self::Plain(Plain {
                 url: upstream.url,
                 hash: hash.parse().map_err(plain::Error::from)?,
                 rename,
+                share_extracted: unpack,
             })),
             upstream::Props::Git { git_ref, .. } => Ok(Self::Git(Git {
                 url: upstream.url,
@@ -162,7 +165,7 @@ impl Stored {
     /// of actual bytes written/copied, by linking files from the storage directory.
     async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
         match self {
-            Stored::Plain(plain) => plain.share(dest_dir)?,
+            Stored::Plain(plain) => plain.share(dest_dir).await?,
             Stored::Git(git) => git.share(&dest_dir.join(&git.name)).await?,
         }
         Ok(())
@@ -453,6 +456,7 @@ upstreams:
                 name: "file.tar.gz".to_owned(),
                 path: "/tmp/file.tar.gz".into(),
                 was_cached: false,
+                share_extracted: false,
             }),
         ];
 
