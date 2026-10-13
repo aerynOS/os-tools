@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use container::Container;
 use fs_err as fs;
 use moss::util;
 use thiserror::Error;
@@ -45,6 +46,8 @@ pub struct Git {
     /// Hash of the commit to be considered as source.
     pub commit: String,
     pub original_index: usize,
+    /// Overrides the directory where the upstream will be shared.
+    pub share_dir: Option<PathBuf>,
 }
 
 impl Git {
@@ -85,6 +88,7 @@ impl Git {
             original_ref: self.commit.to_owned(),
             resolved_hash,
             original_index: self.original_index,
+            share_dir: self.share_dir.clone(),
         })
     }
 
@@ -119,6 +123,7 @@ impl Git {
                 original_ref: self.commit.to_owned(),
                 resolved_hash,
                 original_index: self.original_index,
+                share_dir: self.share_dir.clone(),
             },
             has_ref,
         ))
@@ -161,25 +166,24 @@ pub struct StoredGit {
     pub resolved_hash: String,
     pub original_index: usize,
     pub repo: gitwrap::Repository,
+    /// Overrides the directory where the upstream will be shared.
+    pub share_dir: Option<PathBuf>,
 }
 
 impl StoredGit {
     /// Shares the Git repository in preparation of a build.
-    pub async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
-        if let Some(parent) = dest_dir.parent() {
-            fs::create_dir_all(parent)?;
-        }
+    pub async fn share(&self, cont: &mut Container, dest_dir: &Path) -> Result<(), Error> {
+        let target = dest_dir.join(self.share_dir.as_deref().unwrap_or(Path::new(&self.name)));
+        let target_git = target.join(".git");
 
-        // Clone from our mirror to destdir
-        let cloned = self.repo.clone_to(dest_dir).await?;
-
-        // Cloning sets origin to the local mirror, but we want to use
-        // the original remote as submodule resolving may depend on this
-        let source_origin = self.repo.get_remote_url("origin").await?;
-        cloned.set_remote_url("origin", &source_origin).await?;
-
-        // Finally checkout the desired commit
-        cloned.checkout(&self.resolved_hash).await?;
+        self.repo.add_worktree(&target, &self.resolved_hash).await?;
+        // Worktrees have `.git` file that contains the path
+        // of the "parent" repository. Empirical tests proved
+        // that Git continues to work correctly when we replace the
+        // "link" file with a bind-mount of the parent repository.
+        fs::remove_file(&target_git)?;
+        fs::create_dir(&target_git)?;
+        cont.bind_ro(self.repo.path(), target_git);
 
         Ok(())
     }

@@ -97,17 +97,16 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
         return Err(Error::VerifyBinaryManifestRequired(path.to_owned()));
     }
 
-    let builder = Builder::new(&recipe_path, verify_against.clone(), env, profile, ccache, output)?;
+    let mut builder = Builder::new(&recipe_path, verify_against.clone(), env, profile, ccache, output)?;
     let pkg_name = format!(
         "{}-{}-{}",
         builder.recipe.parsed.source.name, builder.recipe.parsed.source.version, builder.recipe.parsed.source.release
     );
     println!("boulder {}", tools_buildinfo::get_simple_version());
     println!("└─ building {pkg_name}-{build_release}\n");
-    builder.setup(&mut timing, timer, update)?;
 
-    let paths = &builder.paths;
-    let networking = builder.recipe.parsed.options.networking;
+    let mut cont = container::new(&builder.paths, builder.recipe.parsed.options.networking);
+    builder.setup(&mut timing, timer, update, &mut cont)?;
 
     // Set the current thread priority to SCHED_BATCH so that it's inherited by all child processes
     if !normal_priority {
@@ -137,8 +136,7 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
         "block".into(),
     );
 
-    // Build & package from within container
-    container::exec::<Error>(paths, networking, || {
+    cont.run(|| {
         builder.build(&mut timing)?;
 
         let packager = Packager::new(
@@ -152,11 +150,12 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
 
         timing.print_table();
 
-        Ok(())
-    })?;
+        Ok::<(), Error>(())
+    })
+    .map_err(container::Error::from)?;
 
     // Copy artefacts to host recipe dir
-    package::sync_artefacts(paths).map_err(Error::SyncArtefacts)?;
+    package::sync_artefacts(&builder.paths).map_err(Error::SyncArtefacts)?;
 
     if cleanup {
         builder.cleanup().map_err(Error::Cleanup)?;

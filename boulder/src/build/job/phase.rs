@@ -3,7 +3,6 @@
 
 use itertools::Itertools;
 use std::collections::BTreeSet;
-use stone_recipe::upstream;
 
 use moss::util;
 use stone_recipe::tuning::{self, Toolchain};
@@ -77,7 +76,7 @@ impl Phase {
         let target_build = recipe.build_target_definition(target);
 
         let Some(content) = (match self {
-            Phase::Prepare => Some(prepare_script(&recipe.parsed.upstreams)),
+            Phase::Prepare => Some(String::new()),
             Phase::Setup => target_build.setup.clone().or_else(|| root_build.setup.clone()),
             Phase::Build => target_build.build.clone().or_else(|| root_build.build.clone()),
             Phase::Check => target_build.check.clone().or_else(|| root_build.check.clone()),
@@ -234,56 +233,6 @@ impl Phase {
 
         Ok(Some(ScriptBundle::build(env, &prefix, &expr)?))
     }
-}
-
-fn prepare_script(upstreams: &[upstream::Upstream]) -> String {
-    use std::fmt::Write;
-
-    let mut content = String::default();
-
-    for upstream in upstreams {
-        match &upstream.props {
-            upstream::Props::Plain {
-                rename,
-                strip_dirs,
-                unpack,
-                unpack_dir,
-                ..
-            } => {
-                if !unpack {
-                    continue;
-                }
-                let file_name = util::uri_file_name(&upstream.url);
-                let rename = rename.as_deref().unwrap_or(file_name);
-                let unpack_dir = unpack_dir
-                    .as_ref()
-                    .map(|dir| dir.display().to_string())
-                    .unwrap_or_else(|| rename.to_owned());
-                let strip_dirs = strip_dirs.unwrap_or(1);
-
-                let _ = writeln!(&mut content, "mkdir -p {unpack_dir}");
-                let _ = writeln!(
-                    &mut content,
-                    r#"bsdtar-static xf "%(sourcedir)/{rename}" -C "{unpack_dir}" --strip-components={strip_dirs} --no-same-owner || (echo "Failed to extract archive"; exit 1);"#,
-                );
-            }
-            upstream::Props::Git { clone_dir, .. } => {
-                let source = util::uri_file_name(&upstream.url);
-                let target = clone_dir
-                    .as_ref()
-                    .map(|dir| dir.display().to_string())
-                    .unwrap_or_else(|| source.to_owned());
-
-                let _ = writeln!(&mut content, "mkdir -p {target}");
-                let _ = writeln!(
-                    &mut content,
-                    r#"cp -Ra --no-preserve=ownership "%(sourcedir)/{source}/." "{target}""#,
-                );
-            }
-        }
-    }
-
-    content
 }
 
 fn add_tuning(

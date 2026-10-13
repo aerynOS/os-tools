@@ -9,23 +9,25 @@ use std::{
     process, thread,
 };
 
+use ::container::Container;
 use fs_err as fs;
+use futures_util::TryStreamExt;
 use itertools::Itertools;
-use moss::{repository, util};
+use moss::{environment, repository, runtime, util};
 use nix::{
     sys::signal::Signal,
     unistd::{Pid, getpgrp, setpgid},
 };
 use thiserror::Error;
-use tui::Styled;
+use tui::{ProgressBar, ProgressStyle, Styled};
 
 use self::job::{Job, pgo_dir};
 use crate::{
     Env, Macros, Paths, Recipe, Timing,
     architecture::BuildTarget,
     build::script::ScriptBundle,
-    container, macros, profile, recipe, timing,
-    upstream::{self, Upstream},
+    container, macros, profile, recipe, timing, ui,
+    upstream::{self, Upstream, update_git_upstream_refs},
 };
 
 pub mod job;
@@ -116,10 +118,11 @@ impl Builder {
     }
 
     pub fn setup(
-        &self,
+        &mut self,
         timing: &mut Timing,
         initialize_timer: timing::Timer,
         update_repos: bool,
+        cont: &mut Container,
     ) -> Result<Vec<upstream::Stored>, Error> {
         // Recreate artifacts
         util::recreate_dir(&self.paths.artefacts().host).map_err(Error::RecreateArtefactsDir)?;
@@ -142,13 +145,29 @@ impl Builder {
 
         let timer = timing.begin(timing::Kind::Fetch);
 
-        // Sync (fetch & share) upstreams to rootfs
-        let stored = upstream::sync(
-            &self.recipe,
-            &self.upstreams,
-            &self.paths.upstreams().host,
-            &self.paths.guest_host_path(&self.paths.upstreams()),
+        let stored = runtime::block_on(
+            ui::run_parallel(
+                environment::MAX_NETWORK_CONCURRENCY,
+                self.upstreams.iter(),
+                async |ups, pb| store_upstream(ups, &self.paths.upstreams().host, pb).await,
+            )
+            .try_collect::<Vec<_>>(),
         )?;
+
+        self.share_upstreams(cont, &stored)?;
+
+        // FIXME: When building, we should open the recipe file as R/O.
+        // Updating refs should be performed in `recipe new` or `recipe update` only.
+        if let Some(updated_yaml) = update_git_upstream_refs(&self.recipe.source, &stored) {
+            fs::write(&self.recipe.path, updated_yaml)?;
+            println!(
+                concat!(
+                    "{} | Git references resolved to commit hashes and saved to stone.yaml.",
+                    "This ensures reproducible builds since tags and branches can move over time."
+                ),
+                "Warning".yellow()
+            );
+        }
 
         timing.finish(timer);
 
@@ -183,129 +202,160 @@ impl Builder {
     }
 
     pub fn build(&self, timing: &mut Timing) -> Result<(), Error> {
-        // Set ourselves into our own process group
-        // and set it as fg term
-        //
-        // This is so we can restore this process back as
-        // the fg term after using `bash` for chroot below
-        // so we can reestablish SIGINT forwarding to scripts
-        setpgid(Pid::from_raw(0), Pid::from_raw(0))?;
-        let pgid = getpgrp();
-        ::container::set_term_fg(pgid)?;
-
         for (i, target) in self.targets.iter().enumerate() {
             println!("{}", build_target_prefix(target.build_target, i));
 
-            // Clean out any pre-existing profiling data from PGO runs
-            if let Some(job) = target.jobs.iter().find(|job| job.pgo_stage.is_some()) {
-                util::recreate_dir(&pgo_dir(&job.build_dir))?;
+            // Set ourselves into our own process group
+            // and set it as fg term
+            //
+            // This is so we can restore this process back as
+            // the fg term after using `bash` for chroot below
+            // so we can reestablish SIGINT forwarding to scripts
+            setpgid(Pid::from_raw(0), Pid::from_raw(0))?;
+            let pgid = getpgrp();
+            ::container::set_term_fg(pgid)?;
+
+            let err = self.build_target(timing, target);
+            if let Err(e) = &err {
+                if matches!(e, Error::BreakpointExit) {
+                    // Restore ourselves as fg term since bash steals it
+                    ::container::set_term_fg(pgid)?;
+                }
+                return err;
             }
 
-            for (i, job) in target.jobs.iter().enumerate() {
-                let is_pgo = job.pgo_stage.is_some();
+            println!();
+        }
+        Ok(())
+    }
 
-                // Recreate work dir for each job
-                util::recreate_dir(&job.work_dir)?;
+    fn share_upstreams(&self, cont: &mut Container, stored: &[upstream::Stored]) -> Result<(), Error> {
+        let pb = &ProgressBar::new(0).with_style(
+            ProgressStyle::with_template(" {spinner} {wide_msg} ")
+                .unwrap()
+                .tick_chars(ui::PROGRESS_CHARS),
+        );
 
-                if let Some(stage) = job.pgo_stage {
-                    println!("{}", pgo_stage_prefix(stage, i));
+        println!("\nSharing {} upstream(s) with the build container:", stored.len());
+        runtime::block_on(async {
+            for upstream in stored {
+                pb.set_message(format!("{} {}", "Copying".yellow(), upstream.name().bold()));
+                for target in &self.targets {
+                    let dest = &self.paths.build().host.join(target.build_target.to_string());
+                    upstream.share(cont, dest).await?;
+
+                    let cached_tag = upstream
+                        .was_cached()
+                        .then_some(format!("{}", " (cached)".dim()))
+                        .unwrap_or_default();
+                    pb.suspend(|| println!("{} {}{cached_tag}", "Shared".green(), upstream.name().bold()));
                 }
+            }
+            Ok(())
+        })
+    }
 
-                for (i, (phase, script)) in job.phases.iter().enumerate() {
-                    println!("{}", phase_prefix(*phase, is_pgo, i));
+    fn build_target(&self, timing: &mut Timing, target: &Target) -> Result<(), Error> {
+        // Clean out any pre-existing profiling data from PGO runs
+        if let Some(job) = target.jobs.iter().find(|job| job.pgo_stage.is_some()) {
+            util::recreate_dir(&pgo_dir(&job.build_dir))?;
+        }
 
-                    let build_dir = &job.build_dir;
-                    let work_dir = &job.work_dir;
-                    let current_dir = if work_dir.exists() { &work_dir } else { &build_dir };
+        for (i, job) in target.jobs.iter().enumerate() {
+            let is_pgo = job.pgo_stage.is_some();
 
-                    let timer = timing.begin(timing::Kind::Build(timing::Build {
-                        target: job.target,
-                        pgo_stage: job.pgo_stage,
-                        phase: *phase,
-                    }));
+            if let Some(stage) = job.pgo_stage {
+                println!("{}", pgo_stage_prefix(stage, i));
+            }
 
-                    for command in script.commands() {
-                        match command {
-                            &stone_script::Command::Breakpoint { line_num, exit } => {
-                                let line_num = breakpoint_line(line_num, &self.recipe, job.target, *phase)
-                                    .map(|line_num| format!(" at line {line_num}"))
-                                    .unwrap_or_default();
+            for (i, (phase, script)) in job.phases.iter().enumerate() {
+                println!("{}", phase_prefix(*phase, is_pgo, i));
 
-                                println!(
-                                    "\n{}{line_num} {}",
-                                    "Breakpoint".bold(),
-                                    if exit { "(exit)".dim() } else { "(continue)".dim() },
-                                );
+                let build_dir = &job.build_dir;
+                let work_dir = &job.work_dir;
+                let current_dir = if work_dir.exists() { &work_dir } else { &build_dir };
 
-                                // Write env to $HOME/.profile
-                                let profile = format_profile(script)?;
-                                fs::write(build_dir.join(".profile"), profile)?;
+                let timer = timing.begin(timing::Kind::Build(timing::Build {
+                    target: job.target,
+                    pgo_stage: job.pgo_stage,
+                    phase: *phase,
+                }));
 
-                                let mut command = process::Command::new("/usr/bin/bash")
-                                    .arg("--login")
+                for command in script.commands() {
+                    match command {
+                        &stone_script::Command::Breakpoint { line_num, exit } => {
+                            let line_num = breakpoint_line(line_num, &self.recipe, job.target, *phase)
+                                .map(|line_num| format!(" at line {line_num}"))
+                                .unwrap_or_default();
+
+                            println!(
+                                "\n{}{line_num} {}",
+                                "Breakpoint".bold(),
+                                if exit { "(exit)".dim() } else { "(continue)".dim() },
+                            );
+
+                            // Write env to $HOME/.profile
+                            let profile = format_profile(script)?;
+                            fs::write(build_dir.join(".profile"), profile)?;
+
+                            let mut command = process::Command::new("/usr/bin/bash")
+                                .arg("--login")
+                                .env_clear()
+                                .env("HOME", build_dir)
+                                .env("PATH", "/usr/bin:/usr/sbin")
+                                .env("TERM", "xterm-256color")
+                                .current_dir(current_dir)
+                                .spawn()?;
+
+                            command.wait()?;
+
+                            if exit {
+                                return Err(Error::BreakpointExit);
+                            }
+                        }
+                        stone_script::Command::Output { output: content } => {
+                            // TODO: Proper temp file
+                            let script_path = "/tmp/script";
+
+                            {
+                                let mut file = fs::File::create(script_path)?;
+                                writeln!(file, "{content}\n")?;
+                            }
+
+                            let result = logged(*phase, is_pgo, "/usr/bin/bash", |command| {
+                                command
+                                    .arg(script_path)
                                     .env_clear()
                                     .env("HOME", build_dir)
                                     .env("PATH", "/usr/bin:/usr/sbin")
-                                    .env("TERM", "xterm-256color")
                                     .current_dir(current_dir)
-                                    .spawn()?;
+                            })?;
 
-                                command.wait()?;
-
-                                // Restore ourselves as fg term since bash steals it
-                                ::container::set_term_fg(pgid)?;
-
-                                if exit {
-                                    return Err(Error::BreakpointExit);
-                                }
-                            }
-                            stone_script::Command::Output { output: content } => {
-                                // TODO: Proper temp file
-                                let script_path = "/tmp/script";
-
-                                {
-                                    let mut file = fs::File::create(script_path)?;
-                                    writeln!(file, "{content}\n")?;
-                                }
-
-                                let result = logged(*phase, is_pgo, "/usr/bin/bash", |command| {
-                                    command
-                                        .arg(script_path)
-                                        .env_clear()
-                                        .env("HOME", build_dir)
-                                        .env("PATH", "/usr/bin:/usr/sbin")
-                                        .current_dir(current_dir)
-                                })?;
-
-                                if !result.success() {
-                                    match result.code() {
-                                        Some(code) => {
-                                            return Err(Error::Code(code));
-                                        }
-                                        None => {
-                                            if let Some(signal) = result
-                                                .signal()
-                                                .or_else(|| result.stopped_signal())
-                                                .and_then(|i| Signal::try_from(i).ok())
-                                            {
-                                                return Err(Error::Signal(signal));
-                                            } else {
-                                                return Err(Error::UnknownSignal);
-                                            }
+                            if !result.success() {
+                                match result.code() {
+                                    Some(code) => {
+                                        return Err(Error::Code(code));
+                                    }
+                                    None => {
+                                        if let Some(signal) = result
+                                            .signal()
+                                            .or_else(|| result.stopped_signal())
+                                            .and_then(|i| Signal::try_from(i).ok())
+                                        {
+                                            return Err(Error::Signal(signal));
+                                        } else {
+                                            return Err(Error::UnknownSignal);
                                         }
                                     }
                                 }
                             }
                         }
                     }
-
-                    timing.finish(timer);
                 }
+
+                timing.finish(timer);
             }
         }
-
-        println!();
-
         Ok(())
     }
 }
@@ -468,6 +518,18 @@ fn breakpoint_line(line_num: usize, recipe: &Recipe, build_target: BuildTarget, 
             None
         }
     })
+}
+
+async fn store_upstream(ups: &Upstream, storage_dir: &Path, pb: &ProgressBar) -> Result<upstream::Stored, Error> {
+    pb.set_message(format!("{} {}", "Downloading".blue(), ups.name().bold()));
+
+    let stored = ups.store(storage_dir, pb).await.map_err(Error::from)?;
+    let cached_tag = stored
+        .was_cached()
+        .then_some(format!("{}", " (cached)".dim()))
+        .unwrap_or_default();
+    pb.suspend(|| println!("{} {}{cached_tag}", "Downloaded".green(), ups.name().bold()));
+    Ok(stored)
 }
 
 #[derive(Debug, Error)]
