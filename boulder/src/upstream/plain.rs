@@ -41,13 +41,19 @@ pub async fn fetch(url: Url, file_path: &Path, pb: &ProgressBar) -> Result<Hash,
 /// Extracts the source archive into the destination directory.
 /// The destination directory must exist.
 pub async fn extract(archive_path: &Path, dest_dir: &Path) -> Result<(), Error> {
-    Command::new("bsdtar")
+    let output = Command::new("bsdtar")
         .arg("xf")
         .arg(archive_path)
         .arg("-C")
         .arg(dest_dir)
         .output()
         .await?;
+
+    if !output.status.success() {
+        return Err(Error::Extract {
+            message: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        });
+    }
     Ok(())
 }
 
@@ -259,6 +265,9 @@ pub enum Error {
     #[error("request")]
     /// A local or remote fetch failed.
     Request(#[from] request::Error),
+    /// Archive extraction failed.
+    #[error("upstream extraction failed: {message}")]
+    Extract { message: String },
     #[error("io")]
     /// A generic I/O error occurred.
     Io(#[from] io::Error),
