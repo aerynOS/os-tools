@@ -167,26 +167,24 @@ impl TriggerRunner<'_> {
         match self.scope {
             TriggerScope::Transaction(install, _) => {
                 // TODO: Add caching support via /var/
-                let isolation = Container::new(install.isolation_dir())
+                Ok(Container::new(install.isolation_dir())
                     .networking(false)
                     .bind_ro(self.scope.host_path("etc"), "/etc")
                     .bind_rw(self.scope.guest_path("usr"), "/usr")
-                    .work_dir("/");
-
-                Ok(isolation.run(|| execute_trigger_directly(&self.trigger))?)
+                    .work_dir("/")
+                    .run(|| execute_trigger_directly(&self.trigger))?)
             }
             TriggerScope::System(install, _) => {
                 // OK, if the root == `/` then we can run directly, otherwise we need to containerise with RW.
                 if install.root.to_string_lossy() == "/" {
                     Ok(execute_trigger_directly(&self.trigger)?)
                 } else {
-                    let isolation = Container::new(install.isolation_dir())
+                    Ok(Container::new(install.isolation_dir())
                         .networking(false)
                         .bind_rw(self.scope.host_path("etc"), "/etc")
                         .bind_rw(self.scope.guest_path("usr"), "/usr")
-                        .work_dir("/");
-
-                    Ok(isolation.run(|| execute_trigger_directly(&self.trigger))?)
+                        .work_dir("/")
+                        .run(|| execute_trigger_directly(&self.trigger))?)
                 }
             }
         }
