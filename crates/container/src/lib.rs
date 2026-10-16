@@ -30,6 +30,7 @@ use self::idmap::idmap;
 
 mod idmap;
 
+#[derive(Default)]
 pub struct Container {
     root: PathBuf,
     work_dir: Option<PathBuf>,
