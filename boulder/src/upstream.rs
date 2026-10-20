@@ -108,7 +108,7 @@ impl Upstream {
     /// Returns the name of the upstream. This is an informal
     /// name used for logging or when a path to be created
     /// doesn't need to be unique.
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
             Upstream::Plain(plain) => plain.name(),
             Upstream::Git(git) => git.name(),
@@ -119,7 +119,7 @@ impl Upstream {
     /// The final path contained in the storage directory, and the write logic,
     /// depend on the upstream variant. The final path where the upstream is stored
     /// is unique inside the storage directory.
-    async fn store(&self, storage_dir: &Path, pb: &ProgressBar) -> Result<Stored, Error> {
+    pub async fn store(&self, storage_dir: &Path, pb: &ProgressBar) -> Result<Stored, Error> {
         Ok(match self {
             Upstream::Plain(plain) => Stored::Plain(plain.store(storage_dir, pb).await?),
             Upstream::Git(git) => Stored::Git(git.store(storage_dir, pb).await?),
@@ -132,7 +132,7 @@ impl Upstream {
     ///
     /// Careful: this function does not validate the content!
     /// It will be removed even if it does not belong to this Upstream.
-    fn remove(&self, storage_dir: &Path) -> Result<(), Error> {
+    pub fn remove(&self, storage_dir: &Path) -> Result<(), Error> {
         match self {
             Upstream::Plain(plain) => plain.remove(storage_dir).map_err(Error::from),
             Upstream::Git(git) => git.remove(storage_dir).map_err(Error::from),
@@ -147,9 +147,17 @@ pub(crate) enum Stored {
 }
 
 impl Stored {
+    /// Name of the upstream, as returned by [Upstream::name].
+    pub fn name(&self) -> &str {
+        match self {
+            Stored::Plain(plain) => &plain.name,
+            Stored::Git(git) => &git.name,
+        }
+    }
+
     /// Whether the upstream did not need to be written at the moment
     /// of being stored, because the constant was already there and valid.
-    fn was_cached(&self) -> bool {
+    pub fn was_cached(&self) -> bool {
         match self {
             Stored::Plain(plain) => plain.was_cached,
             Stored::Git(git) => git.was_cached,
@@ -160,7 +168,7 @@ impl Stored {
     ///
     /// This function tries to be as efficient as possible in terms
     /// of actual bytes written/copied, by linking files from the storage directory.
-    async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
+    pub async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
         match self {
             Stored::Plain(plain) => plain.share(dest_dir)?,
             Stored::Git(git) => git.share(&dest_dir.join(&git.name)).await?,
