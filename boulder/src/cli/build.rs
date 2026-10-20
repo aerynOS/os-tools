@@ -105,9 +105,9 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
     println!("boulder {}", tools_buildinfo::get_simple_version());
     println!("└─ building {pkg_name}-{build_release}\n");
 
+    let stored = builder.setup(&mut timing, timer, update)?;
     let mut cont = container::new(&builder.paths, builder.recipe.parsed.options.networking);
-
-    builder.setup(&mut cont, &mut timing, timer, update)?;
+    builder.share_upstreams(&mut cont, &stored)?;
 
     // Set the current thread priority to SCHED_BATCH so that it's inherited by all child processes
     if !normal_priority {
@@ -137,7 +137,6 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
         "block".into(),
     );
 
-    // Build & package from within container
     cont.run(|| {
         builder.build(&mut timing)?;
 
