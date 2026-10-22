@@ -329,9 +329,11 @@ fn remove(global: Global, args: RemoveArgs, installation: Installation) -> Resul
         )?;
     } else if args.prune {
         unimplemented!("Pruning all states but bootable ones is not yet implemented");
+    } else {
+        unreachable!();
     }
 
-    unreachable!();
+    Ok(())
 }
 
 fn build_vfs(installation: Installation) -> Result<(), Error> {
