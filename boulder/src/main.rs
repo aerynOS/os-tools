@@ -25,6 +25,7 @@ mod paths;
 mod profile;
 mod recipe;
 mod timing;
+mod ui;
 mod upstream;
 
 fn main() {
