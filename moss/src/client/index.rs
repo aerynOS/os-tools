@@ -241,6 +241,8 @@ pub enum Error {
 ///
 /// Inputs must start with `/` (be absolute) and not contain `.` or `..` segments.
 fn rel_path_from_to(from_dir: &Path, to: &Path) -> PathBuf {
+    let from_dir = from_dir.canonicalize().unwrap();
+
     assert!(from_dir.is_absolute());
     assert!(to.is_absolute());
 

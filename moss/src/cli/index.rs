@@ -29,7 +29,7 @@ pub struct Command {
 
 impl Command {
     pub fn handle(self) -> Result<(), Error> {
-        moss::client::index(&self.input_dir, self.output_dir.as_deref())?;
+        moss::client::index(&self.input_dir.canonicalize().unwrap(), self.output_dir.as_deref())?;
         Ok(())
     }
 }
