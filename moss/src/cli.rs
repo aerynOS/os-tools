@@ -10,6 +10,7 @@ use std::{
 
 use clap::{Args, Parser};
 use moss::{Installation, client, installation};
+use stone::StoneReadError;
 use thiserror::Error;
 use tui::Styled;
 
@@ -17,6 +18,7 @@ mod boot;
 mod cache;
 mod completions;
 mod index;
+mod inspect;
 mod pkg;
 mod repo;
 mod search;
@@ -48,6 +50,12 @@ pub enum Error {
 
     #[error("index")]
     Index(#[from] client::index::Error),
+
+    #[error("stone format")]
+    Format(#[from] StoneReadError),
+
+    #[error("One or more files failed the integrity check")]
+    ValidationFailed,
 
     #[error(transparent)]
     Package(#[from] pkg::Error),
@@ -169,6 +177,7 @@ impl Command {
             Subcommand::Cache(cmd) => cmd.handle(installation)?,
             Subcommand::Completions(cmd) => cmd.handle()?,
             Subcommand::Index(cmd) => cmd.handle()?,
+            Subcommand::Inspect(cmd) => cmd.handle()?,
             Subcommand::Pkg(cmd) => cmd.handle(self.global, installation)?,
             Subcommand::Repo(cmd) => cmd.handle(installation)?,
             Subcommand::Search(cmd) => cmd.handle(installation)?,
@@ -190,7 +199,6 @@ impl Command {
         ("pex", &["pkg", "extract"]),
         ("pfe", &["pkg", "fetch"]),
         ("pif", &["pkg", "info"]),
-        ("pit", &["pkg", "inspect"]),
         ("pls", &["pkg", "list"]),
         ("prm", &["pkg", "remove"]),
         ("rad", &["repo", "add"]),
@@ -209,8 +217,6 @@ impl Command {
         ("stl", &["state", "list"]),
         ("sts", &["state", "search"]),
         ("sve", &["state", "verify"]),
-        ("sy", &["sync"]),
-        ("up", &["sync"]),
     ];
 }
 
@@ -273,6 +279,8 @@ enum Subcommand {
     Cache(cache::Command),
     Completions(completions::Command),
     Index(index::Command),
+    #[command(about = "Show detailed (debug) information on a local `.stone` file")]
+    Inspect(inspect::Command),
     #[command(name = "pkg", alias = "package")]
     Pkg(pkg::Command),
     #[command(name = "repo", alias = "repository")]

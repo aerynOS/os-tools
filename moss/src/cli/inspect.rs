@@ -1,19 +1,40 @@
 // SPDX-FileCopyrightText: 2023 AerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
+use clap::Parser;
 use fs_err::File;
 use std::io::{Read, Seek, sink};
 use std::path::PathBuf;
 use stone::{StoneDecodedPayload, StonePayloadLayoutFile, StonePayloadMetaPrimitive, StonePayloadMetaTag};
 
-use crate::cli::pkg::{Error, InspectArgs};
+use crate::cli::Error;
 
-/// Inspect the given .stone files and print results
-pub fn inspect(args: InspectArgs) -> Result<(), Error> {
-    if args.check {
-        handle_check(args.paths, args.quiet)
-    } else {
-        handle_detailed(args.paths)
+#[derive(Debug, Parser)]
+#[command(about = "Inspect `.stone` format files for debugging purposes")]
+pub struct Command {
+    #[arg(help = "`.stone` format file(s) to inspect")]
+    paths: Vec<PathBuf>,
+
+    #[arg(short, long, help = "Check the integrity of the `.stone` format file(s)")]
+    check: bool,
+
+    #[arg(
+        short,
+        long,
+        requires = "check",
+        help = "Suppress output, only exit status indicates success or failure (requires --check)"
+    )]
+    quiet: bool,
+}
+
+impl Command {
+    /// Inspect the given .stone files and print results
+    pub fn handle(self) -> Result<(), Error> {
+        if self.check {
+            handle_check(self.paths, self.quiet)
+        } else {
+            handle_detailed(self.paths)
+        }
     }
 }
 
@@ -184,7 +205,7 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
-    const VALID_STONE_BYTES: &[u8] = include_bytes!("../../../../test/bash-completion-2.11-1-1-x86_64.stone");
+    const VALID_STONE_BYTES: &[u8] = include_bytes!("../../../test/bash-completion-2.11-1-1-x86_64.stone");
 
     #[test]
     fn test_check_valid_stone() {

@@ -5,7 +5,6 @@ use std::{io, path::PathBuf};
 
 use clap::Parser;
 use info::info;
-use inspect::inspect;
 use list::list;
 use moss::{Client, Installation, client, dependency::Provider, environment};
 use stone::StoneReadError;
@@ -13,7 +12,6 @@ use thiserror::Error;
 use tracing::instrument;
 
 mod info;
-mod inspect;
 mod list;
 
 use crate::cli::{Confirmation, Global};
@@ -32,7 +30,6 @@ impl Command {
             Subcommand::Fetch { output_dir, packages } => fetch(global, output_dir, packages, installation),
             Subcommand::Add(args) => add(global, args, installation),
             Subcommand::Info(args) => info(args, installation),
-            Subcommand::Inspect(args) => inspect(args),
             Subcommand::List(args) => list(args, installation),
             Subcommand::Extract { files, output_dir } => extract(files, output_dir),
             Subcommand::Remove(args) => remove(global, args, installation),
@@ -50,8 +47,6 @@ pub enum Error {
     Client(#[from] client::Error),
     #[error("stone format")]
     Format(#[from] StoneReadError),
-    #[error("One or more files failed the integrity check")]
-    ValidationFailed,
     #[error(transparent)]
     Extract(#[from] client::extract::Error),
     #[error(transparent)]
@@ -78,9 +73,6 @@ enum Subcommand {
 
     #[command(about = "Show information about the package provider [aliases: pif]")]
     Info(InfoArgs),
-
-    #[command(about = "Show detailed (debug) information on a local `.stone` file [aliases: pit]")]
-    Inspect(InspectArgs),
 
     #[command(about = "List all installed packages according to the resolution of the system-model [aliases: pls]")]
     List(ListArgs),
@@ -124,23 +116,6 @@ struct InfoArgs {
     repositories: Vec<String>,
     #[arg(short = 'f', long = "show-files", help = "Show files provided by package")]
     show_files: bool,
-}
-
-#[derive(Clone, Debug, clap::Args)]
-struct InspectArgs {
-    #[arg(help = "Files to inspect")]
-    paths: Vec<PathBuf>,
-
-    #[arg(short, long, help = "Check the integrity of the stone file(s)")]
-    check: bool,
-
-    #[arg(
-        short,
-        long,
-        requires = "check",
-        help = "Suppress output, only exit status indicates success or failure (requires --check)"
-    )]
-    quiet: bool,
 }
 
 #[derive(Clone, Debug, clap::Args)]
