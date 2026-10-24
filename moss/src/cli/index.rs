@@ -29,7 +29,16 @@ pub struct Command {
 
 impl Command {
     pub fn handle(self) -> Result<(), Error> {
-        moss::client::index(&self.input_dir, self.output_dir.as_deref())?;
+        // moss::client::index expects absolute paths.
+        let input_dir = &self.input_dir.canonicalize()?;
+        let output_dir = if let Some(out) = &self.output_dir {
+            &out.canonicalize()?
+        } else {
+            input_dir
+        };
+
+        moss::client::index(input_dir, Some(output_dir))?;
+
         Ok(())
     }
 }
