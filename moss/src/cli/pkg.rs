@@ -17,7 +17,7 @@ mod list;
 use crate::cli::{Confirmation, Global};
 
 #[derive(Debug, Parser)]
-#[command(about = "Manage installed packages and get info on available packages")]
+#[command(about = "Manage, list and show packages")]
 pub struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,
@@ -66,23 +66,22 @@ enum Subcommand {
         packages: Vec<Provider>,
     },
 
-    #[command(
-        about = "Add package(s) to the implicit system-model from a file path or by name in the repo [aliases: pad]"
-    )]
+    #[command(about = "Add package(s) to the implicit system-model [aliases: pad]")]
     Add(AddArgs),
 
     #[command(about = "Show information about the package provider [aliases: pif]")]
     Info(InfoArgs),
 
-    #[command(about = "List all installed packages according to the resolution of the system-model [aliases: pls]")]
+    #[command(about = "List packages according to the supplied filter argument (requires an argument)")]
     List(ListArgs),
 
-    #[command(about = "Extract contents of Stone archive(s) to disk [aliases: pex]")]
+    #[command(about = "Extract contents of `.stone` archive(s) to disk [aliases: pex]")]
     Extract {
         #[arg(help = "valid moss-format archives(s) to extract")]
         files: Vec<PathBuf>,
 
         #[arg(
+            short,
             long = "output-dir",
             help = "directory to which to extract moss-format archive(s) (default: `.`)",
             default_value = "."
@@ -90,13 +89,13 @@ enum Subcommand {
         output_dir: PathBuf,
     },
 
-    #[command(about = "Removes package(s) from the implicit system-model [aliases: prm]")]
+    #[command(about = "Remove package(s) from the implicit system-model [aliases: prm]")]
     Remove(RemoveArgs),
 }
 
 #[derive(Clone, Debug, clap::Args)]
 struct AddArgs {
-    #[arg(help = "Package names or providers to install")]
+    #[arg(help = "Package name(s) or provider(s) to add to the system-model")]
     providers: Vec<Provider>,
     #[arg(long)]
     reinstall: bool,
@@ -123,34 +122,44 @@ struct ListArgs {
     #[arg(
         short,
         long,
-        help = "Filter to list of explicitly added packages in the implicit system-model"
+        help = "List available packages given the active system-model repositories [aliases: pla]"
+    )]
+    available: bool,
+    #[arg(
+        short,
+        long,
+        help = "List explicitly added packages in the system-model [aliases: ple]"
     )]
     explicit: bool,
     #[arg(
         short,
         long,
-        help = "Filter to list all available packages given the active repositories in the implicit system-model"
+        help = "List the resolved set of packages installed from the system-model [aliases: pli]"
     )]
-    available: bool,
-    #[arg(short, long, help = "Filter to list of known repositories")]
+    installed: bool,
+    #[arg(
+        short,
+        long,
+        help = "Limit the list of packages to the specified, known repositories"
+    )]
     repositories: Vec<String>,
     #[arg(
         short,
         long,
-        help = "Filter to list the packages that would be sync'd based on the current cached repository state"
+        help = "List the packages that would be sync'd based on the cached repository state [aliases: pls]"
     )]
     sync: bool,
 }
 
 #[derive(Clone, Debug, clap::Args)]
 struct RemoveArgs {
-    #[arg(help = "Package names or providers to remove")]
+    #[arg(help = "Package name(s) or provider(s) to remove from the system-model")]
     providers: Vec<Provider>,
     #[arg(long, help = "Simulate the operation")]
     dry_run: bool,
 }
 
-/// Handle execution of `moss fetch`
+/// Handle execution of `moss pkg fetch`
 #[instrument(skip_all)]
 fn fetch(
     global: Global,
@@ -170,7 +179,7 @@ fn fetch(
     Ok(())
 }
 
-/// Handle execution of `moss install`
+/// Handle execution of `moss pkg add`
 #[instrument(skip_all)]
 fn add(global: Global, args: AddArgs, installation: Installation) -> Result<(), Error> {
     let pkgs = args.providers.iter().map(|prov| prov.to_string()).collect::<Vec<_>>();
@@ -191,7 +200,7 @@ fn add(global: Global, args: AddArgs, installation: Installation) -> Result<(), 
     Ok(())
 }
 
-/// Handle execution of `moss remove`
+/// Handle execution of `moss pkg remove`
 #[instrument(skip_all)]
 fn remove(global: Global, args: RemoveArgs, installation: Installation) -> Result<(), Error> {
     let pkgs = args.providers.iter().map(|p| p.to_string()).collect::<Vec<_>>();
@@ -206,6 +215,7 @@ fn remove(global: Global, args: RemoveArgs, installation: Installation) -> Resul
     Ok(())
 }
 
+/// Handle execution of `moss pkg extract`
 fn extract(files: Vec<PathBuf>, output_dir: PathBuf) -> Result<(), Error> {
     let paths_ref = files.iter().collect();
     client::extract(paths_ref, &output_dir)?;

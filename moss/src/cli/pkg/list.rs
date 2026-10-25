@@ -18,6 +18,9 @@ pub fn list(args: ListArgs, installation: Installation) -> Result<(), pkg::Error
     if args.explicit {
         flags = flags.with_installed().with_explicit();
     }
+    if args.installed {
+        flags = flags.with_installed();
+    }
     if args.sync {
         flags = flags.with_installed();
     }
