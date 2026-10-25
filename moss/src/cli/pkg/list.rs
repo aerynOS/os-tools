@@ -12,14 +12,12 @@ pub fn list(args: ListArgs, installation: Installation) -> Result<(), pkg::Error
     }
 
     let mut flags = Flags::new();
+    flags = flags.with_installed();
     if args.available {
         flags = flags.with_available();
     }
     if args.explicit {
         flags = flags.with_installed().with_explicit();
-    }
-    if args.sync {
-        flags = flags.with_installed();
     }
 
     // Grab a client for the target, enumerate packages
