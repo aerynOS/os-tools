@@ -161,19 +161,16 @@ struct SearchArgs {
     filter_removed: bool,
 }
 
-// These args are mutually exclusive. We would use a enum for that,
-// but clap does not support this feature: we must pass "exclusive=true"
-// to all args manually. See
-// https://users.rust-lang.org/t/mutually-exclusive-command-line-arguments-with-clap-or-another-library/134091
 #[derive(Debug, Clone, clap::Args)]
+#[group(required = true, multiple = false)]
 struct RemoveArgs {
-    #[arg(num_args=1.., exclusive = true, value_parser = parse_state_list)]
+    #[arg(num_args=1.., value_parser = parse_state_list)]
     states: Vec<RangeInclusive<i32>>,
 
-    #[arg(short, long, exclusive = true, help = "Remove all but the n latest states")]
+    #[arg(short, long, help = "Remove all but the n latest states")]
     keep: Option<u32>,
 
-    #[arg(short, long, exclusive = true, help = "Remove all but the currently bootable states")]
+    #[arg(short, long, help = "Remove all but the currently bootable states")]
     prune: bool,
 }
 
