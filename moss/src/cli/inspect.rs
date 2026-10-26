@@ -10,12 +10,12 @@ use stone::{StoneDecodedPayload, StonePayloadLayoutFile, StonePayloadMetaPrimiti
 use crate::cli::Error;
 
 #[derive(Debug, Parser)]
-#[command(about = "Inspect `.stone` format files for debugging purposes")]
+#[command(about = "Inspect moss-format files for debugging purposes")]
 pub struct Command {
-    #[arg(required = true, help = "`.stone` format file(s) to inspect")]
+    #[arg(required = true, help = "moss-format format file(s) to inspect")]
     paths: Vec<PathBuf>,
 
-    #[arg(short, long, help = "Check the integrity of the `.stone` format file(s)")]
+    #[arg(short, long, help = "Check the integrity of the moss-format file(s)")]
     check: bool,
 
     #[arg(

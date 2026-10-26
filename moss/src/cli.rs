@@ -282,7 +282,7 @@ enum Subcommand {
     Cache(cache::Command),
     Completions(completions::Command),
     Index(index::Command),
-    #[command(about = "Show detailed (debug) information on a local `.stone` file")]
+    #[command(about = "Show detailed (debug) information on a moss-format file")]
     Inspect(inspect::Command),
     #[command(name = "pkg", alias = "package")]
     Pkg(pkg::Command),

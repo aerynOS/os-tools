@@ -7,7 +7,7 @@ use clap::Parser;
 use moss::client::index::Error;
 
 #[derive(Debug, Parser)]
-#[command(about = "Index a collection of .stone packages")]
+#[command(about = "Index a collection of moss-format packages")]
 pub struct Command {
     #[arg(
         short,
@@ -21,7 +21,7 @@ pub struct Command {
     #[arg(
         short,
         long = "output-dir",
-        help = "The directory to which to write the stone.index [default: INPUT_DIR]",
+        help = "The directory to which to write the package index [default: INPUT_DIR]",
         global = false
     )]
     output_dir: Option<PathBuf>,

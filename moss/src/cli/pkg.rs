@@ -55,9 +55,9 @@ pub enum Error {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    #[command(about = "Fetch package stone(s) by name or provider [aliases: pfe]")]
+    #[command(about = "Fetch package file(s) by name or provider [aliases: pfe]")]
     Fetch {
-        /// directory to write the fetched stone(s)
+        /// directory to write the fetched moss-format package(s)
         #[arg(short, long, default_value = ".")]
         output_dir: PathBuf,
 
@@ -75,7 +75,7 @@ enum Subcommand {
     #[command(about = "List packages according to the supplied filter argument (requires an argument)")]
     List(ListArgs),
 
-    #[command(about = "Extract contents of `.stone` archive(s) to disk [aliases: pex]")]
+    #[command(about = "Extract contents of moss-format package(s) to disk [aliases: pex]")]
     Extract {
         #[arg(required = true, help = "valid moss-format archives(s) to extract")]
         files: Vec<PathBuf>,

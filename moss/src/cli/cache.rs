@@ -34,7 +34,7 @@ enum Subcommand {
     #[command(
         about = concat!(
             "Prune cached artefacts. ",
-            "This will remove all downloaded stones and unpacked asset data ",
+            "This will remove all downloaded packages and unpacked asset data ",
             "for packages not in any state or active repository")
     )]
     Prune,
