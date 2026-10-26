@@ -120,7 +120,7 @@ impl Command {
         Self::parse_expanded_from(std::env::args_os())
     }
 
-    pub fn parse_expanded_from<I, T>(raw_args: I) -> Self
+    pub fn try_parse_expanded_from<I, T>(raw_args: I) -> Result<Self, clap::Error>
     where
         I: IntoIterator<Item = T>,
         T: Into<OsString> + Clone,
@@ -129,18 +129,17 @@ impl Command {
 
         let cmd = Self::parse_from(raw_args.iter());
         let Subcommand::Alias(cmd_args) = &cmd.subcommand else {
-            return cmd;
+            return Ok(cmd);
         };
         let Some(alias) = cmd_args.first() else {
-            return cmd;
+            return Ok(cmd);
         };
 
         let Ok(alias_index) = Self::ALIASES.binary_search_by_key(&alias.as_os_str(), |(key, _)| OsStr::new(key)) else {
-            clap::Error::raw(
+            return Err(clap::Error::raw(
                 clap::error::ErrorKind::InvalidSubcommand,
                 format!("unknown command or alias \"{}\"", alias.to_string_lossy()),
-            )
-            .exit();
+            ));
         };
 
         let cmd_start = raw_args
@@ -153,7 +152,18 @@ impl Command {
             .chain(Self::ALIASES[alias_index].1.iter().map(OsStr::new))
             .chain(cmd_args[1..].iter().map(|arg| arg.as_os_str()));
 
-        Self::parse_from(raw_args)
+        Self::try_parse_from(raw_args)
+    }
+
+    pub fn parse_expanded_from<I, T>(raw_args: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<OsString> + Clone,
+    {
+        match Self::try_parse_expanded_from(raw_args) {
+            Ok(cmd) => cmd,
+            Err(err) => err.exit(),
+        }
     }
 
     /// Run the CLI according to users' flags and arguments.
@@ -350,29 +360,35 @@ mod tests {
     }
 
     #[test]
-    fn alias_retain_global_flags_head() {
-        let command = Command::parse_expanded_from(["moss", "-D", "/tmp", "--verbose", "pad", "mypackage"].iter());
+    fn alias_retain_global_flags_head() -> Result<(), String> {
+        let command = Command::try_parse_expanded_from(["moss", "-D", "/tmp", "--verbose", "pad", "mypackage"].iter())
+            .map_err(|error| error.to_string())?;
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
         assert!(matches!(command.subcommand, super::Subcommand::Pkg(_)));
+        Ok(())
     }
 
     #[test]
-    fn alias_retain_global_flags_tail() {
-        let command = Command::parse_expanded_from(["moss", "pad", "mypackage", "-D", "/tmp", "--verbose"].iter());
+    fn alias_retain_global_flags_tail() -> Result<(), String> {
+        let command = Command::try_parse_expanded_from(["moss", "pad", "mypackage", "-D", "/tmp", "--verbose"].iter())
+            .map_err(|error| error.to_string())?;
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
         assert!(matches!(command.subcommand, super::Subcommand::Pkg(_)));
+        Ok(())
     }
 
     #[test]
-    fn alias_retain_global_flags_mixed() {
-        let command = Command::parse_expanded_from(["moss", "-D", "/tmp", "pad", "mypackage", "--verbose"].iter());
+    fn alias_retain_global_flags_mixed() -> Result<(), String> {
+        let command = Command::try_parse_expanded_from(["moss", "-D", "/tmp", "pad", "mypackage", "--verbose"].iter())
+            .map_err(|error| error.to_string())?;
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
         assert!(matches!(command.subcommand, super::Subcommand::Pkg(_)));
+        Ok(())
     }
 }
