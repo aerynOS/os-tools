@@ -12,7 +12,7 @@ use crate::cli::Error;
 #[derive(Debug, Parser)]
 #[command(about = "Inspect `.stone` format files for debugging purposes")]
 pub struct Command {
-    #[arg(help = "`.stone` format file(s) to inspect")]
+    #[arg(required = true, help = "`.stone` format file(s) to inspect")]
     paths: Vec<PathBuf>,
 
     #[arg(short, long, help = "Check the integrity of the `.stone` format file(s)")]

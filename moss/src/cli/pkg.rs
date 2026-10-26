@@ -77,7 +77,7 @@ enum Subcommand {
 
     #[command(about = "Extract contents of `.stone` archive(s) to disk [aliases: pex]")]
     Extract {
-        #[arg(help = "valid moss-format archives(s) to extract")]
+        #[arg(required = true, help = "valid moss-format archives(s) to extract")]
         files: Vec<PathBuf>,
 
         #[arg(
@@ -95,7 +95,7 @@ enum Subcommand {
 
 #[derive(Clone, Debug, clap::Args)]
 struct AddArgs {
-    #[arg(help = "Package name(s) or provider(s) to add to the system-model")]
+    #[arg(required = true, help = "Package name(s) or provider(s) to add to the system-model")]
     providers: Vec<Provider>,
     #[arg(long)]
     reinstall: bool,
@@ -154,7 +154,10 @@ struct ListArgs {
 
 #[derive(Clone, Debug, clap::Args)]
 struct RemoveArgs {
-    #[arg(help = "Package name(s) or provider(s) to remove from the system-model")]
+    #[arg(
+        required = true,
+        help = "Package name(s) or provider(s) to remove from the system-model"
+    )]
     providers: Vec<Provider>,
     #[arg(long, help = "Simulate the operation")]
     dry_run: bool,

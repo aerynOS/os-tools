@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn alias_retain_global_flags_head() {
-        let command = Command::parse_expanded_from(["moss", "-D", "/tmp", "--verbose", "pad"].iter());
+        let command = Command::parse_expanded_from(["moss", "-D", "/tmp", "--verbose", "pad", "mypackage"].iter());
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn alias_retain_global_flags_tail() {
-        let command = Command::parse_expanded_from(["moss", "pad", "-D", "/tmp", "--verbose"].iter());
+        let command = Command::parse_expanded_from(["moss", "pad", "mypackage", "-D", "/tmp", "--verbose"].iter());
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn alias_retain_global_flags_mixed() {
-        let command = Command::parse_expanded_from(["moss", "-D", "/tmp", "pad", "--verbose"].iter());
+        let command = Command::parse_expanded_from(["moss", "-D", "/tmp", "pad", "mypackage", "--verbose"].iter());
 
         assert_eq!(command.global.root_dir, Some("/tmp".into()));
         assert!(command.global.verbose);
