@@ -17,7 +17,7 @@ mod list;
 use crate::cli::{Confirmation, Global};
 
 #[derive(Debug, Parser)]
-#[command(about = "Manage, list and show packages")]
+#[command(about = "Manage, list, or show packages")]
 pub struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,

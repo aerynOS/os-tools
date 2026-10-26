@@ -23,10 +23,7 @@ use tui::Styled;
 use crate::cli::{Confirmation, Global};
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "state",
-    about = "Manage the available software repositories visible to the installed system"
-)]
+#[command(name = "state", about = "Manage, list, or search available system states")]
 pub struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,
@@ -65,16 +62,16 @@ pub enum Error {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    #[command(about = "Activate the given valid state [aliases: sac]")]
+    #[command(about = "Activate the given valid state [aliases: sta]")]
     Activate(ActivateArgs),
 
-    #[command(about = "Get the currently active state [aliases: sag]")]
+    #[command(about = "Get the currently active state [aliases: stg]")]
     GetActive,
 
     #[command(about = "List all states [aliases: stl]")]
     List(ListArgs),
 
-    #[command(about = "Search a state [aliases: sts]")]
+    #[command(about = "Search one or more states [aliases: sts]")]
     Search(SearchArgs),
 
     #[command(about = "Show information about a state [aliases: sti]")]
@@ -83,7 +80,7 @@ enum Subcommand {
         id: String,
     },
 
-    #[command(about = "Verify and fix system states and assets [aliases: sve]")]
+    #[command(about = "Verify and fix system states and assets [aliases: stv]")]
     Verify,
 
     #[command(about = "Export a state as a system-model.kdl file [aliases: ste]")]
@@ -99,7 +96,7 @@ enum Subcommand {
         output: Option<Option<PathBuf>>,
     },
 
-    #[command(about = "Remove arbitrary states. Supports single states and inclusive ranges a-b [aliases: srm]")]
+    #[command(about = "Remove arbitrary states. Supports single states and inclusive ranges a-b [aliases: str]")]
     Remove(RemoveArgs),
 
     // For profiling only, hence hidden.
@@ -124,11 +121,22 @@ struct ActivateArgs {
 
 #[derive(Debug, Clone, clap::Args)]
 struct ListArgs {
-    #[arg(short = 's', long = "sync", help = "Reduce the output to synced states")]
-    filter_synced: bool,
+    #[arg(
+        short = 'a',
+        long = "added",
+        help = "Filter output to packages added to the system-model"
+    )]
+    filter_added: bool,
 
-    #[arg(short = 'r', long = "remove", help = "Reduce the output to removed states")]
+    #[arg(
+        short = 'r',
+        long = "removed",
+        help = "Filter output to packages removed from the system-model"
+    )]
     filter_removed: bool,
+
+    #[arg(short = 's', long = "synced", help = "Filter output to synced packages")]
+    filter_synced: bool,
 }
 
 #[derive(Clone, Debug, clap::Args)]
@@ -137,28 +145,28 @@ struct SearchArgs {
     id: Option<String>,
 
     #[arg(
-        short = 's',
-        long = "sync",
-        conflicts_with = "id",
-        help = "Reduce the output to synced states"
-    )]
-    filter_synced: bool,
-
-    #[arg(
         short = 'a',
-        long = "activate",
+        long = "added",
         conflicts_with = "id",
-        help = "Reduce the output to activated states"
+        help = "Filter output to packages added to the system-model"
     )]
-    filter_activated: bool,
+    filter_added: bool,
 
     #[arg(
         short = 'r',
-        long = "remove",
+        long = "removed",
         conflicts_with = "id",
-        help = "Reduce the output to removed states"
+        help = "Filter output to packages removed from the system-model"
     )]
     filter_removed: bool,
+
+    #[arg(
+        short = 's',
+        long = "synced",
+        conflicts_with = "id",
+        help = "Filter output to synced packages"
+    )]
+    filter_synced: bool,
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -211,13 +219,14 @@ fn get_active(installation: Installation) -> Result<(), Error> {
     } else {
         eprintln!("No active state");
     }
+
     Ok(())
 }
 
 /// List all known states, newest first
 fn list(global: Global, args: ListArgs, installation: Installation) -> Result<(), Error> {
-    if args.filter_synced || args.filter_removed {
-        unimplemented!("Filtered arguments not yet implemented");
+    if args.filter_added || args.filter_removed || args.filter_synced {
+        unimplemented!("Filter arguments not yet implemented");
     }
 
     let client = Client::new(environment::NAME, installation)?;
@@ -255,12 +264,14 @@ fn info(id: String, installation: Installation) -> Result<(), Error> {
         print_state(state.clone());
         print_state_selections(state, &client)?;
     }
+
     Ok(())
 }
 
 fn verify(global: Global, installation: Installation) -> Result<(), Error> {
     let client = Client::new(environment::NAME, installation)?;
     client.verify(global.confirm == Confirmation::DoNotAsk, global.verbose)?;
+
     Ok(())
 }
 

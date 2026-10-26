@@ -210,16 +210,16 @@ impl Command {
         ("rls", &["repo", "list"]),
         ("rrm", &["repo", "remove"]),
         ("rup", &["repo", "update"]),
-        ("sac", &["state", "activate"]),
-        ("sag", &["state", "get-active"]),
-        ("sf", &["search-file"]),
-        ("sr", &["search"]),
-        ("srm", &["state", "remove"]),
+        ("sr", &["search"]),       // The least bad option (still not good)
+        ("srf", &["search-file"]), // NOTE: This might go away once the search verb is properly realised
+        ("sta", &["state", "activate"]),
+        ("stg", &["state", "get-active"]),
+        ("str", &["state", "remove"]),
         ("ste", &["state", "export"]),
         ("sti", &["state", "info"]),
         ("stl", &["state", "list"]),
         ("sts", &["state", "search"]),
-        ("sve", &["state", "verify"]),
+        ("stv", &["state", "verify"]),
     ];
 }
 

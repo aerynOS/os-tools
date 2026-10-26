@@ -12,7 +12,7 @@ use tui::Styled;
 #[derive(Debug, Parser)]
 #[command(
     name = "search-file",
-    about = "Search files by looking into installed package [aliases: sf]"
+    about = "Search for the package to which an installed file belongs [aliases: srf]"
 )]
 pub struct Command {
     #[arg(value_parser = NonEmptyStringValueParser::new(), help = "Name of a file or directory to look for")]
