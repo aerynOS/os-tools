@@ -25,6 +25,7 @@ mod search;
 mod search_file;
 mod state;
 mod sync;
+mod tree;
 
 pub fn run() -> Result<(), BoxedError> {
     Command::parse_expanded().run()
@@ -194,6 +195,7 @@ impl Command {
             Subcommand::SearchFile(cmd) => cmd.handle(installation)?,
             Subcommand::State(cmd) => cmd.handle(self.global, installation)?,
             Subcommand::Sync(cmd) => cmd.handle(self.global, installation)?,
+            Subcommand::Tree(cmd) => cmd.handle(),
 
             Subcommand::Alias(_) => unreachable!(),
         }
@@ -302,6 +304,7 @@ enum Subcommand {
     SearchFile(search_file::Command),
     State(state::Command),
     Sync(sync::Command),
+    Tree(tree::Command),
 
     /// This is not a real subcommand, but a hook
     /// for our alias-to-subcommands translator.
