@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-use clap::{Args, Parser};
+use clap::{Args, CommandFactory, Parser};
 use moss::{Installation, client, installation};
 use stone::StoneReadError;
 use thiserror::Error;
@@ -137,10 +137,7 @@ impl Command {
         };
 
         let Ok(alias_index) = Self::ALIASES.binary_search_by_key(&alias.as_os_str(), |(key, _)| OsStr::new(key)) else {
-            return Err(clap::Error::raw(
-                clap::error::ErrorKind::InvalidSubcommand,
-                format!("unknown command or alias \"{}\"", alias.to_string_lossy()),
-            ));
+            return Err(Self::unknown_subcommand_error(&raw_args));
         };
 
         let cmd_start = raw_args
@@ -165,6 +162,27 @@ impl Command {
             Ok(cmd) => cmd,
             Err(err) => err.exit(),
         }
+    }
+
+    /// Builds the error for an unknown subcommand/alias.
+    /// The caller must ensure no subcommand or alias matches, given
+    /// the provided `raw_args`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a subcommand or alias matches
+    fn unknown_subcommand_error(raw_args: &[OsString]) -> clap::Error {
+        Self::command()
+            .allow_external_subcommands(false)
+            .external_subcommand_value_parser(clap::builder::Resettable::Reset)
+            // HACK: hidden subcommands, only so similar aliases are also suggested
+            .subcommands(
+                Self::ALIASES
+                    .iter()
+                    .map(|(alias, _)| clap::Command::new(*alias).hide(true)),
+            )
+            .try_get_matches_from(raw_args)
+            .expect_err("subcommand or alias should not match")
     }
 
     /// Run the CLI according to users' flags and arguments.
