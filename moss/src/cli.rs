@@ -128,7 +128,7 @@ impl Command {
     {
         let raw_args: Vec<OsString> = raw_args.into_iter().map(Into::into).collect();
 
-        let cmd = Self::parse_from(raw_args.iter());
+        let cmd = Self::try_parse_from(raw_args.iter())?;
         let Subcommand::Alias(cmd_args) = &cmd.subcommand else {
             return Ok(cmd);
         };
