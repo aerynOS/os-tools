@@ -1,0 +1,18 @@
+$ boulder profile update --help
+--- exit status: 0
+--- stdout
+Update a profiles repositories
+
+Usage: boulder profile update [OPTIONS]
+
+Options:
+  -p, --profile <PROFILE>        [default: default-x86_64]
+  -v, --verbose                  Print additional information about what boulder is doing
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr
