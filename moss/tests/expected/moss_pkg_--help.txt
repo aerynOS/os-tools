@@ -1,0 +1,29 @@
+$ moss pkg --help
+--- exit status: 0
+--- stdout
+Manage, list, or show packages
+
+Usage: moss pkg [OPTIONS] <COMMAND>
+
+Commands:
+  fetch    Fetch package file(s) by name or provider [aliases: pfe]
+  add      Add package(s) to the implicit system-model [aliases: pad]
+  info     Show information about the package provider [aliases: pif]
+  list     List packages according to the supplied filter argument (requires an argument)
+  extract  Extract contents of moss-format package(s) to disk [aliases: pex]
+  remove   Remove package(s) from the implicit system-model [aliases: prm]
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

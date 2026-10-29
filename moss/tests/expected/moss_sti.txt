@@ -1,0 +1,10 @@
+$ moss sti
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <ID>
+
+Usage: moss state info <ID>
+
+For more information, try '--help'.

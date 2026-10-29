@@ -1,0 +1,11 @@
+$ boulder profile add
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  --repo <REPOS>
+  <NAME>
+
+Usage: boulder profile add --repo <REPOS> <NAME>
+
+For more information, try '--help'.

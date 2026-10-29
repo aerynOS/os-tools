@@ -1,0 +1,11 @@
+$ moss stt
+--- exit status: 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'stt'
+
+  tip: some similar subcommands exist: 'sta', 'ste', 'stg', 'sti', 'stl', 'str', 'sts', 'stv', 'state'
+
+Usage: moss [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

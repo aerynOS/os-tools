@@ -1,0 +1,10 @@
+$ moss pif
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <PROVIDER>
+
+Usage: moss pkg info <PROVIDER>
+
+For more information, try '--help'.

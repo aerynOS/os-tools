@@ -1,0 +1,26 @@
+$ moss pkg info --help
+--- exit status: 0
+--- stdout
+Show information about the package provider [aliases: pif]
+
+Usage: moss pkg info [OPTIONS] <PROVIDER>
+
+Arguments:
+  <PROVIDER>  
+
+Options:
+  -r, --repositories <REPOSITORIES>  Filter to list of known repositories
+  -f, --show-files                   Show files provided by package
+  -h, --help                         Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

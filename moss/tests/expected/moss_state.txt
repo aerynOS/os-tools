@@ -1,0 +1,31 @@
+$ moss state
+--- exit status: 2
+--- stdout
+--- stderr
+Manage, list, or search available system states
+
+Usage: moss state [OPTIONS] <COMMAND>
+
+Commands:
+  activate    Activate the given valid state [aliases: sta]
+  get-active  Get the currently active state [aliases: stg]
+  list        List all states [aliases: stl]
+  search      Search one or more states [aliases: sts]
+  info        Show information about a state [aliases: sti]
+  verify      Verify and fix system states and assets [aliases: stv]
+  export      Export a state as a system-model.kdl file [aliases: ste]
+  remove      Remove arbitrary states. Supports single states and inclusive ranges a-b [aliases: str]
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit

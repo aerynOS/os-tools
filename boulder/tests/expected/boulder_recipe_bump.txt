@@ -1,0 +1,5 @@
+$ boulder recipe bump
+--- exit status: 1
+--- stdout
+--- stderr
+Error: recipe: resolve recipe path: recipe file does not exist: "./stone.yaml"

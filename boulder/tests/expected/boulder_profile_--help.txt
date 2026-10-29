@@ -1,0 +1,23 @@
+$ boulder profile --help
+--- exit status: 0
+--- stdout
+Manage boulder profiles
+
+Usage: boulder profile [OPTIONS] <COMMAND>
+
+Commands:
+  list    List profiles
+  add     Add a new profile
+  update  Update a profiles repositories
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --verbose                  Print additional information about what boulder is doing
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

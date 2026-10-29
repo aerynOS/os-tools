@@ -1,0 +1,33 @@
+$ boulder recipe --help
+--- exit status: 0
+--- stdout
+Utilities to create and manipulate stone recipe files
+
+Usage: boulder recipe [OPTIONS] <COMMAND>
+
+Commands:
+  bump    Bump a recipe's release
+  new     Create skeletal stone.yaml recipe from source archive URIs
+  update  Update a recipe file
+          
+          If no version or upstreams are provided, boulder will attempt to autoupdate the
+          recipe, using the release information supplied in the monitoring.yaml file.
+          
+          If a version is passed but no upstream is passed, boulder will attempt to guess
+          the new url from the existing url.
+          
+          If an upstream is passed but no version is passed, boulder will parse the new
+          version from the new upstream.
+  macros  Print macro definitions
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --verbose                  Print additional information about what boulder is doing
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

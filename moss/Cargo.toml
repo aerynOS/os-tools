@@ -68,6 +68,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 moss = { path = ".", features = ["testing"] }
+cli_expected = { path = "../crates/cli_expected" }
 
 tempfile.workspace = true
 

@@ -1,0 +1,68 @@
+$ boulder build --help
+--- exit status: 0
+--- stdout
+Build stone package(s) from a stone recipe file
+
+Usage: boulder build [OPTIONS] [RECIPE]
+
+Arguments:
+  [RECIPE]
+          Path to recipe file
+          
+          [default: ./stone.yaml]
+
+Options:
+  -p, --profile <PROFILE>
+          [default: default-x86_64]
+
+  -v, --verbose
+          Print additional information about what boulder is doing
+
+  -c, --compiler-cache
+          Enable compiler caching
+
+  -V, --version
+          
+
+  -u, --update
+          Update profile repositories before building
+
+  -y, --yes
+          Answer yes to confirmation prompts
+
+      --cache-dir <CACHE_DIR>
+          
+
+      --normal-priority
+          Run the build without lowering the process priority
+
+      --config-dir <CONFIG_DIR>
+          
+
+  -o, --output <OUTPUT>
+          Directory to store build results
+          
+          [default: .]
+
+  -b, --build-release <BUILD_RELEASE>
+          Specify the build release number used for this build
+          
+          [default: 1]
+
+      --data-dir <DATA_DIR>
+          
+
+      --cleanup
+          Automatically cleanup all build related artefacts
+
+      --moss-root <MOSS_ROOT>
+          
+
+      --verify <MANIFEST>
+          Verify the built manifest against the provided [MANIFEST] file and fail the build if they don't match
+          
+          If supplied & the manifests do match, the existing manifests are preserved instead of being overwritten
+
+  -h, --help
+          Print help (see a summary with '-h')
+--- stderr

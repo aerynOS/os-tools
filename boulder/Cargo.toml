@@ -62,6 +62,7 @@ astr.workspace = true
 tempfile.workspace = true
 
 [dev-dependencies]
+cli_expected = { path = "../crates/cli_expected" }
 tempfile.workspace = true
 
 [lints]

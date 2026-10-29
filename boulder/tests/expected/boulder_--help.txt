@@ -1,0 +1,24 @@
+$ boulder --help
+--- exit status: 0
+--- stdout
+Usage: boulder [OPTIONS] [COMMAND]
+
+Commands:
+  build    Build stone package(s) from a stone recipe file
+  cache    Manage boulder caches
+  chroot   Chroot into the build environment
+  profile  Manage boulder profiles
+  recipe   Utilities to create and manipulate stone recipe files
+  version  Print version info and exit
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --verbose                  Print additional information about what boulder is doing
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

@@ -1,0 +1,26 @@
+$ moss state activate --help
+--- exit status: 0
+--- stdout
+Activate the given valid state [aliases: sta]
+
+Usage: moss state activate [OPTIONS] <STATE>
+
+Arguments:
+  <STATE>  
+
+Options:
+      --skip-triggers  Do not run triggers on activation
+      --skip-boot      Do not sync boot on activation
+  -h, --help           Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

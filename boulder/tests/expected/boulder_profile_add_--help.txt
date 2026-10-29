@@ -1,0 +1,27 @@
+$ boulder profile add --help
+--- exit status: 0
+--- stdout
+Add a new profile
+
+Usage: boulder profile add [OPTIONS] --repo <REPOS> <NAME>
+
+Arguments:
+  <NAME>  profile name
+
+Options:
+  -r, --repo <REPOS>             Repositories to add to profile.
+                                 It accepts a space-separated list of repository properties.
+                                 Each property is then separated by a comma.
+                                 "name" and "uri" or "base-uri" are mandatory properties.
+                                 
+                                 Example: --repo name=volatile,base-uri=https://cdn.aerynos.dev,version=stream/unstable,priority=100
+                                 Example: --repo name=volatile,uri=https://cdn.aerynos.dev/unstable/x86_64/stone.index,priority=100
+  -v, --verbose                  Print additional information about what boulder is doing
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

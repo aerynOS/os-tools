@@ -1,0 +1,50 @@
+$ moss pkg add --help
+--- exit status: 0
+--- stdout
+Add package(s) to the implicit system-model [aliases: pad]
+
+Usage: moss pkg add [OPTIONS] <PROVIDERS>...
+
+Arguments:
+  <PROVIDERS>...
+          Package name(s) or provider(s) to add to the system-model
+
+Options:
+      --reinstall
+          
+
+      --dry-run
+          Simulate the operation
+
+      --to <dir>
+          Blit this sync to the provided directory instead of the root.
+          
+          This operation won't be captured as a new state.
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -v, --verbose
+          Prints additional information about what moss is doing
+
+  -D, --directory <ROOT_DIR>
+          Root directory
+          
+          [default: /]
+
+      --cache-dir <CACHE_DIR>
+          Cache directory
+
+      --log <LOG>
+          Logging configuration: <level>[:<format>][:<destination>]
+          Levels: trace, debug, info, warn, error
+          Formats: text, json
+          Destinations: stderr, <file>
+
+  -y, --yes
+          Assume yes for all questions
+
+  -V, --version
+          Print version and exit
+--- stderr

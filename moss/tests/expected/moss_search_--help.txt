@@ -1,0 +1,27 @@
+$ moss search --help
+--- exit status: 0
+--- stdout
+Search providers (including packages) by name and summary [aliases: sr]
+
+Usage: moss search [OPTIONS] <KEYWORD>
+
+Arguments:
+  <KEYWORD>  Keyword to search for in package names and summaries
+
+Options:
+  -p, --provides <PROVIDES>          Filter the type of provider (e.g. binary, soname)
+  -i, --installed                    Search only among installed packages
+  -r, --repositories <REPOSITORIES>  Filter search to specific repositories (comma-separated list)
+  -h, --help                         Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

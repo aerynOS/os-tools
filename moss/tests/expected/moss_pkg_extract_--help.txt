@@ -1,0 +1,25 @@
+$ moss pkg extract --help
+--- exit status: 0
+--- stdout
+Extract contents of moss-format package(s) to disk [aliases: pex]
+
+Usage: moss pkg extract [OPTIONS] <FILES>...
+
+Arguments:
+  <FILES>...  valid moss-format archives(s) to extract
+
+Options:
+  -o, --output-dir <OUTPUT_DIR>  directory to which to extract moss-format archive(s) (default: `.`) [default: .]
+  -h, --help                     Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

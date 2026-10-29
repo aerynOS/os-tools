@@ -1,0 +1,26 @@
+$ moss inspect --help
+--- exit status: 0
+--- stdout
+Show detailed (debug) information on a moss-format file
+
+Usage: moss inspect [OPTIONS] <PATHS>...
+
+Arguments:
+  <PATHS>...  moss-format format file(s) to inspect
+
+Options:
+  -c, --check  Check the integrity of the moss-format file(s)
+  -q, --quiet  Suppress output, only exit status indicates success or failure (requires --check)
+  -h, --help   Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr
