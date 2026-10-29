@@ -1,0 +1,35 @@
+$ moss
+--- exit status: 2
+--- stdout
+--- stderr
+aerynOS' package manager
+
+Usage: moss [OPTIONS] <COMMAND>
+
+Commands:
+  boot         Manage boot configuration via blsforme
+  cache        Managed cached data
+  completions  Generate shell completions and man pages
+  index        Index a collection of moss-format packages
+  inspect      Show detailed (debug) information on a moss-format file
+  pkg          Manage, list, or show packages
+  repo         Manage the available software repositories visible to the installed system
+  search       Search providers (including packages) by name and summary [aliases: sr]
+  search-file  Search for the package to which an installed file belongs [aliases: srf]
+  state        Manage, list, or search available system states
+  sync         Sync package selections with candidates from the highest priority repository
+  tree         
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit

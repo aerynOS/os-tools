@@ -1,0 +1,12 @@
+$ moss rad
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  --comment <COMMENT>
+  <NAME>
+  <URL>
+
+Usage: moss repo add --comment <COMMENT> <NAME> <URL>
+
+For more information, try '--help'.

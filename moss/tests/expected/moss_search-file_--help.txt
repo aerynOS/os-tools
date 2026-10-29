@@ -1,0 +1,24 @@
+$ moss search-file --help
+--- exit status: 0
+--- stdout
+Search for the package to which an installed file belongs [aliases: srf]
+
+Usage: moss search-file [OPTIONS] <KEYWORD>
+
+Arguments:
+  <KEYWORD>  Name of a file or directory to look for
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

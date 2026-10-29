@@ -1,0 +1,10 @@
+$ moss repo remove
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <NAME>
+
+Usage: moss repo remove <NAME>
+
+For more information, try '--help'.

@@ -1,0 +1,11 @@
+$ moss foo
+--- exit status: 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'foo'
+
+  tip: a similar subcommand exists: 'boot'
+
+Usage: moss [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

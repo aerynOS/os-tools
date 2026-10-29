@@ -1,0 +1,24 @@
+$ moss repo update --help
+--- exit status: 0
+--- stdout
+Update the system repositories [aliases: rup]
+
+Usage: moss repo update [OPTIONS] [NAME]
+
+Arguments:
+  [NAME]  Repository to update. If not provided, all will be updated
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr
