@@ -231,12 +231,6 @@ fn list(global: Global, args: ListArgs, installation: Installation) -> Result<()
 
     let client = Client::new(environment::NAME, installation)?;
 
-    if let Some(state) = client.get_active_state()? {
-        print_state(state.clone());
-        if global.verbose {
-            print_state_selections(state, &client)?;
-        }
-    }
     for state in client.list_states()?.into_iter().rev() {
         print_state(state.clone());
         if global.verbose {
