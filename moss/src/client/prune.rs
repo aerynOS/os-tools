@@ -94,9 +94,8 @@ pub(super) fn prune_states(client: &Client, strategy: Strategy<'_>, yes: bool) -
             .collect(),
     };
 
-    // Bail if there's no states to remove
     if removal_ids.is_empty() {
-        // TODO: Print no states to be removed
+        eprintln!("No state to remove with this selection");
         return Ok(());
     }
 
