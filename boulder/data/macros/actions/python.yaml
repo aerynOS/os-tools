@@ -33,7 +33,14 @@ actions:
     - pyproject_install:
         description: Install wheel to destination directory
         command: |
-            python3 -m installer --destdir="%(installroot)" dist/*.whl
+            pyproject_install(){
+                if [ $# -gt 0 ]; then
+                    python3 -m installer --destdir="%(installroot)" "$@"
+                else
+                    python3 -m installer --destdir="%(installroot)" dist/*.whl
+                fi
+            }
+            pyproject_install
         dependencies:
             - binary(python3)
             - python-installer
