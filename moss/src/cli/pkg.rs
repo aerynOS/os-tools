@@ -4,9 +4,10 @@
 use std::{io, path::PathBuf};
 
 use clap::Parser;
+use clap_complete::ArgValueCompleter;
 use info::info;
 use list::list;
-use moss::{Client, Installation, client, dependency::Provider, environment};
+use moss::{Client, Installation, client, completions, dependency::Provider, environment, package::Flags};
 use stone::StoneReadError;
 use thiserror::Error;
 use tracing::instrument;
@@ -95,7 +96,7 @@ enum Subcommand {
 
 #[derive(Clone, Debug, clap::Args)]
 struct AddArgs {
-    #[arg(required = true, help = "Package name(s) or provider(s) to add to the system-model")]
+    #[arg(required = true, help = "Package name(s) or provider(s) to add to the system-model", add = ArgValueCompleter::new(completions::prefix_completer(Flags::new().with_available())))]
     providers: Vec<Provider>,
     #[arg(long)]
     reinstall: bool,
