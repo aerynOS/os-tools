@@ -5,7 +5,10 @@
 // but we don't Ord or Hash off that field
 #![allow(clippy::mutable_key_type)]
 
-use std::{collections::BTreeMap, fmt};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use fnmatch::Pattern;
 use serde::Deserialize;
@@ -59,18 +62,18 @@ impl CompiledHandler {
 
 impl Handler {
     /// Substitute all paths using matched variables
-    pub fn compiled(&self, with_match: &fnmatch::Match) -> CompiledHandler {
+    pub fn compiled(&self, with_match: &HashMap<String, String>) -> CompiledHandler {
         match self {
             Handler::Run { run, args } => {
                 let mut run = run.clone();
-                for (key, value) in &with_match.variables {
+                for (key, value) in with_match {
                     run = run.replace(&format!("$({key})"), value);
                 }
                 let args = args
                     .iter()
                     .map(|a| {
                         let mut a = a.clone();
-                        for (key, value) in &with_match.variables {
+                        for (key, value) in with_match {
                             a = a.replace(&format!("$({key})"), value);
                         }
                         a
@@ -133,9 +136,9 @@ mod tests {
 
         let (pattern, _) = trigger.paths.iter().next().expect("Missing path entry");
         let result = pattern
-            .match_path("/usr/lib/modules/6.6.7-267.current/kernel")
+            .matches("/usr/lib/modules/6.6.7-267.current/kernel")
             .expect("Couldn't match path");
-        let version = result.variables.get("version").expect("Missing kernel version");
+        let version = result.get("version").expect("Missing kernel version");
         assert_eq!(version, "6.6.7-267.current", "Wrong kernel version match");
         eprintln!("trigger: {trigger:?}");
         eprintln!("match: {result:?}");

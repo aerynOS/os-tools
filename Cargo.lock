@@ -1097,9 +1097,10 @@ dependencies = [
 name = "fnmatch"
 version = "0.26.10"
 dependencies = [
+ "criterion",
  "regex",
  "serde_core",
- "snafu",
+ "wildmatch",
 ]
 
 [[package]]
@@ -3888,6 +3889,12 @@ checksum = "58ec80e73fd8baf57bf0d9615554c75348bda990d6d5bbeab964dd068319fecb"
 dependencies = [
  "rustls-pki-types",
 ]
+
+[[package]]
+name = "wildmatch"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29333c3ea1ba8b17211763463ff24ee84e41c78224c16b001cd907e663a38c68"
 
 [[package]]
 name = "winapi"

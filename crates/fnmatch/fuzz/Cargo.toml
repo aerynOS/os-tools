@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 AerynOS Developers
+# SPDX-License-Identifier: MPL-2.0
+
+[package]
+name = "fnmatch-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.fnmatch]
+path = ".."
+
+[[bin]]
+name = "fuzzer"
+path = "fuzz_targets/fuzzer.rs"
+test = false
+doc = false
+bench = false
