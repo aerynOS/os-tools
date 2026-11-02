@@ -324,6 +324,7 @@ enum Subcommand {
     SearchFile(search_file::Command),
     State(state::Command),
     Sync(sync::Command),
+    #[command(hide = true)]
     Tree(tree::Command),
 
     /// This is not a real subcommand, but a hook

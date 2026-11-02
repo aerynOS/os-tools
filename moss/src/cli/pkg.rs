@@ -96,7 +96,11 @@ enum Subcommand {
 
 #[derive(Clone, Debug, clap::Args)]
 struct AddArgs {
-    #[arg(required = true, help = "Package name(s) or provider(s) to add to the system-model", add = ArgValueCompleter::new(completions::prefix_completer(Flags::new().with_available())))]
+    #[arg(
+        required = true,
+        help = "Package name(s) or provider(s) to add to the system-model",
+        add = ArgValueCompleter::new(completions::prefix_completer(Flags::new().with_available())),
+    )]
     providers: Vec<Provider>,
     #[arg(long)]
     reinstall: bool,
@@ -111,6 +115,7 @@ struct AddArgs {
 
 #[derive(Clone, Debug, clap::Args)]
 struct InfoArgs {
+    #[arg(add = ArgValueCompleter::new(completions::prefix_completer(Flags::new().with_available())))]
     provider: Provider,
     #[arg(short, long, help = "Filter to list of known repositories")]
     repositories: Vec<String>,
@@ -157,7 +162,8 @@ struct ListArgs {
 struct RemoveArgs {
     #[arg(
         required = true,
-        help = "Package name(s) or provider(s) to remove from the system-model"
+        help = "Package name(s) or provider(s) to remove from the system-model",
+        add = ArgValueCompleter::new(completions::prefix_completer(Flags::new().with_installed())),
     )]
     providers: Vec<Provider>,
     #[arg(long, help = "Simulate the operation")]
