@@ -77,7 +77,7 @@ struct AddArgs {
 
     url: Url,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "n/a")]
     comment: String,
 
     #[arg(short, long, help = "Repository priority", default_value_t = 0)]

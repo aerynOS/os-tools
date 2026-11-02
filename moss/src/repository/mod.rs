@@ -48,6 +48,10 @@ impl Id {
 /// Repository configuration data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
+    /// Optional description for the repository,
+    /// to aid users.
+    /// When a description is unnecessary, set it
+    /// to the empty string.
     pub description: String,
     #[serde(flatten)]
     pub source: Source,
