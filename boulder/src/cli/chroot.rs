@@ -3,6 +3,7 @@
 
 use std::{io, path::PathBuf, process};
 
+use crate::upstream::{self, parse_recipe};
 use crate::{
     Env, Macros, Paths, Recipe,
     architecture::{self, BuildTarget},
@@ -10,6 +11,7 @@ use crate::{
 };
 use clap::Parser;
 use fs_err as fs;
+use moss::runtime;
 use thiserror::Error;
 
 #[derive(Debug, Parser)]
@@ -23,8 +25,22 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
     let Command { recipe: recipe_path } = command;
 
     let recipe = Recipe::load(recipe_path)?;
+    let paths = Paths::new(&recipe, None, env.cache_dir.clone(), "/mason", ".")?;
+    let mut cont = container::new(&paths, recipe.parsed.options.networking);
+    runtime::block_on(async {
+        for stored in parse_recipe(&recipe)?
+            .into_iter()
+            .map(async |up| up.stored(&paths.upstreams().host).await)
+        {
+            let stored = stored.await?;
+            for target in recipe.build_targets() {
+                let dest = paths.build().guest.join(target.to_string());
+                stored.config_mounts(&mut cont, &dest);
+            }
+        }
+        Ok::<_, Error>(())
+    })?;
     let macros = Macros::load(&env)?;
-    let paths = Paths::new(&recipe, None, env.cache_dir, "/mason", ".")?;
 
     let rootfs = paths.rootfs().host;
 
@@ -55,7 +71,7 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
 
     let home = &paths.build().guest;
 
-    container::exec(&paths, recipe.parsed.options.networking, || {
+    cont.run(|| {
         fs::write(home.join(".profile"), profile)?;
 
         let mut child = process::Command::new("/bin/bash")
@@ -86,6 +102,8 @@ pub enum Error {
     BuildScript(#[source] build::job::Error),
     #[error("recipe")]
     Recipe(#[from] recipe::Error),
+    #[error(transparent)]
+    Upstream(#[from] upstream::Error),
     #[error("io")]
     Io(#[from] io::Error),
     #[error("build")]

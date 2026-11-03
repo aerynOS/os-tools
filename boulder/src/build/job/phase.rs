@@ -99,10 +99,6 @@ impl Phase {
             return Ok(None);
         };
 
-        if content.is_empty() {
-            return Ok(None);
-        }
-
         let build_target = target.to_string();
         let build_dir = paths.build().guest.join(&build_target);
         let work_dir = if matches!(self, Phase::Prepare) {

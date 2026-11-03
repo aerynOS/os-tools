@@ -140,6 +140,22 @@ impl Upstream {
         })
     }
 
+    pub async fn stored(&self, storage_dir: &Path) -> Result<Stored, Error> {
+        Ok(match self {
+            Upstream::Plain(plain) => Stored::Plain(plain.stored(storage_dir)?),
+            Upstream::Git(git) => {
+                let (repo, has_commit) = git.stored(storage_dir).await?;
+                if !has_commit {
+                    return Err(Error::from(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "repository does not have the required commit",
+                    )));
+                }
+                Stored::Git(repo)
+            }
+        })
+    }
+
     /// Unconditionally removes this Upstream's resources within the storage directory.
     /// If the resources do not exist, this function returns successfully
     /// (it is idempotent).
