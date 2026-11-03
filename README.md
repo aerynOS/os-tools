@@ -24,7 +24,7 @@ This approach allows `moss` to efficiently keep all package contents for many tr
 
 ### `.stone`
 
-`.stone` is the native aerynOS package format. It separates package metadata, filesystem layout, content indexing and file data, allowing `moss` and `boulder` to work with package contents independently of their final filesystem representation.
+`.stone` is the native aerynOS package format. It separates package metadata, filesystem layout, content indexing and file data, enabling `moss` and `boulder` to work with package contents independently of their final filesystem representation.
 
 ## Installation
 
