@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 AerynOS Developers
+# SPDX-FileCopyrightText: 2026 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 version = 1
@@ -8,5 +8,5 @@ version = 1
 # it is a valid copyright notice anyway.
 [[annotations]]
 path = ["Cargo.lock", "funding.json", "test/**/*.stone"]
-SPDX-FileCopyrightText = "AerynOS Developers"
+SPDX-FileCopyrightText = "aerynOS Developers"
 SPDX-License-Identifier = "MPL-2.0"

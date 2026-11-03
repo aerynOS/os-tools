@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 AerynOS Developers
+// SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 //! Version pattern extraction library for extracting version numbers and project names from file paths and URLs.

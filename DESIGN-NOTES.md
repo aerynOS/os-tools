@@ -1,13 +1,13 @@
 <!--
-# SPDX-FileCopyrightText: 2025 AerynOS Developers
+# SPDX-FileCopyrightText: 2025 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 -->
 
-# How AerynOS delivers software to OS installs
+# How aerynOS delivers software to OS installs
 
 ## Software package metadata: manifest.*.bin
 
-The `manifest.${ARCH}.bin` files contain all the metadata needed by the AerynOS tooling. For context, the `manifest.${ARCH}.jsonc` files are only there for git diff purposes and human-readable insight. They are completely ignored by the tooling.
+The `manifest.${ARCH}.bin` files contain all the metadata needed by the aerynOS tooling. For context, the `manifest.${ARCH}.jsonc` files are only there for git diff purposes and human-readable insight. They are completely ignored by the tooling.
 
     **Ikey Doherty**
     > our manifest.*.bin format is just a .stone in disguise
@@ -21,7 +21,7 @@ The `manifest.${ARCH}.bin` files contain all the metadata needed by the AerynOS 
 
 ## Software distribution via *.stone packages
 
-AerynOS distributes software via its custom `stone` format. This format was explicitly built to enable fast, deduplicated transmission and installation of software artefacts on target OS installs.
+aerynOS distributes software via its custom `stone` format. This format was explicitly built to enable fast, deduplicated transmission and installation of software artefacts on target OS installs.
 
     > **Ikey Doherty**
     > Context: we dont mix layout + metadata (unlike in alpine, where tar records are used for metadata)
@@ -47,8 +47,8 @@ AerynOS distributes software via its custom `stone` format. This format was expl
     > and is delta-friendly (in future) by not locking paths to contents
     > In summary: "A lot more than a single tar file can do."
     > the vfs crate is actually borderline devil magic
-    > https://github.com/AerynOS/os-tools/blob/main/crates/vfs/src/tree/mod.rs
-    > https://github.com/AerynOS/os-tools/blob/main/crates/vfs/src/tree/builder.rs
+    > https://github.com/aerynOS/os-tools/blob/main/crates/vfs/src/tree/mod.rs
+    > https://github.com/aerynOS/os-tools/blob/main/crates/vfs/src/tree/builder.rs
     > but it does mean we can bake the view of the applied/installed OS ahead of time in memory and organise/optimise it
     > and we use that to make "new" installs each time under /.moss/root/staging
     > we then do some magic shit with linux containers (kernel namespaces) to enter the new system and run some triggers in an ephemeral copy

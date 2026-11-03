@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 AerynOS Developers
+// SPDX-FileCopyrightText: 2024 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 use crate::draft::File;
 use crate::draft::build::{Error, Phases, State};

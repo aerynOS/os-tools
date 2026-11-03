@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 AerynOS Developers
+// SPDX-FileCopyrightText: 2023 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 //! Moss (v1) dependency and provider types
@@ -17,7 +17,7 @@
 //!
 //! We acknowledge the current dependency format, while powerful, does not allow expressing
 //! relationship constraints. This was a deliberate decision due to the rolling nature of
-//! AerynOS, however more expressive dependency types will be introduced in the next major
+//! aerynOS, however more expressive dependency types will be introduced in the next major
 //! stone format.
 use std::str::FromStr;
 

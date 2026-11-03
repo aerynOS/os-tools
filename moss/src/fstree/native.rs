@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 AerynOS Developers
+// SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 use std::{
@@ -359,7 +359,7 @@ fn blit_element_item(
 
             match *id {
                 // Mystery empty-file hash. Do not allow dupes!
-                // https://github.com/AerynOS/os-tools/issues/372
+                // https://github.com/aerynOS/os-tools/issues/372
                 EMPTY_FILE_HASH => {
                     let fd = fcntl::openat(
                         parent,

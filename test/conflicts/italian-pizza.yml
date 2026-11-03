@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 AerynOS Developers
+# SPDX-FileCopyrightText: 2024 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 name        : italian-pizza
@@ -7,7 +7,7 @@ release     : 1
 summary     : A certain Italian pizza that hates pineapples
 description : Me no like pineapples.
 license     : Zlib
-homepage    : https://github.com/AerynOS
+homepage    : https://github.com/aerynOS
 conflicts   :
     - pineapple
 install     : |

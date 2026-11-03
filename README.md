@@ -1,5 +1,5 @@
 <!--
-# SPDX-FileCopyrightText: 2023 AerynOS Developers
+# SPDX-FileCopyrightText: 2023 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 -->
 
@@ -9,11 +9,11 @@
 
 Our stance is that we are here to help train people's minds and skills. As an analogy, it would defeat the purpose if you brought an industrial robot with you to the gym so it could lift weights for you.
 
-For more details, consult our [Contribution guidelines](https://github.com/AerynOS/os-tools?tab=contributing-ov-file#llm-contributions).
+For more details, consult our [Contribution guidelines](https://github.com/aerynOS/os-tools?tab=contributing-ov-file#llm-contributions).
 
 ## 📦 Core Tools
 
-This repository provides two powerful Rust-based tools for managing `.stone` packages, the native package format for AerynOS:
+This repository provides two powerful Rust-based tools for managing `.stone` packages, the native package format for aerynOS:
 
 - **moss**: Advanced package & system state manager with atomic transactions and content deduplication
 - **boulder**: Modern package building tool with containerized builds and intelligent package splitting
@@ -70,16 +70,16 @@ The `.stone` format is a structured binary package format designed for modern, r
 ## 🚀 Onboarding
 
 ```bash
-# clone the AerynOS os-tools repo somewhere reasonable
-mkdir -pv ~/repos/aos/
-cd ~/repos/aos/
-git clone https://github.com/AerynOS/os-tools.git
-cd tools/
+# clone the aerynOS os-tools repo somewhere reasonable
+mkdir -pv ~/Projects/aerynos/
+cd ~/Projects/aerynos/
+git clone https://github.com/aerynOS/os-tools.git
+cd os-tools/
 
-# Install a few prerequisites (this how you'd do it on AerynOS)
-sudo moss it binutils glibc-devel linux-headers clang bsdtar-static cpio
+# Install a few prerequisites (this how you'd do it on aerynOS)
+sudo moss pkg add rust binutils glibc-devel linux-headers clang bsdtar-static cpio
 
-# remember to add ~/.cargo/bin to your $PATH if this is how you installed rustfmt
+    # remember to add ~/.cargo/bin to your $PATH if this is how you installed rustfmt
 cargo install rustfmt
 
 cargo install typos-cli --locked
@@ -96,7 +96,7 @@ sudo usermod --add-subuids 1000000-1065535 --add-subgids 1000000-1065535 root
 sudo usermod --add-subuids 1065536-1131071 --add-subgids 1065536-1131071 ${USER}
 ```
 
-**NB:** If you want to build .stones with boulder on your _non-aeryn_ host system, you will need to specify the
+**NB:** If you want to build .stones with boulder on your _non-aerynOS_ host system, you will need to specify the
 location of the boulder data files (which live in ${HOME}/.local/share/boulder if you used `just get-started` like above):
 
 ```bash
@@ -105,7 +105,7 @@ alias boulder="${HOME}/.local/bin/boulder --data-dir=${HOME}/.local/share/boulde
 
 ## 📚 Documentation
 
-See [aerynos.dev](https://aerynos.dev/).
+See [aerynos.com/aerynos](https://aerynos.com/aerynos/).
 
 ## 🧪 Experiment
 
@@ -119,16 +119,16 @@ just get-started
 mkdir -pv aosroot/
 
 # Add the unstable repo
-moss -D aosroot/ repo add unstable https://cdn.aerynos.dev/stream/unstable/x86_64/stone.index
+moss -D aosroot/ repo add unstable https://cdn.aerynos.dev --root-index channel=main,version=stream/unstable
 
 # List packages
-moss -D aosroot/ list available
+moss -D aosroot/ pkg list --available
 
 # Install something
-moss -D aosroot/ install systemd bash libx11-32bit
+moss -D aosroot/ pkg add systemd bash libx11-32bit
 ```
 
-If you want to create systemd-nspawn roots or bootable VMs, please check out the [img-tests](https://github.com/AerynOS/img-tests) repository.
+If you want to create systemd-nspawn roots or bootable VMs, please check out the [img-tests](https://github.com/aerynOS/img-tests) repository.
 
 
 ## 🤝 Contributing changes
