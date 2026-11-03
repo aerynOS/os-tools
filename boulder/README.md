@@ -1,5 +1,5 @@
 <!--
-# SPDX-FileCopyrightText: 2024 AerynOS Developers
+# SPDX-FileCopyrightText: 2024 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 -->
 
@@ -19,4 +19,4 @@ This will produce a debug build by default, which is available as  `./target/deb
 
 ## Onboarding
 
-Refer to the moss onboarding instructions [here](https://github.com/AerynOS/os-tools?tab=readme-ov-file#-onboarding).
+Refer to the moss onboarding instructions [here](https://github.com/aerynOS/os-tools?tab=readme-ov-file#-onboarding).

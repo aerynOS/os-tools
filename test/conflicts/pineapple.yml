@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 AerynOS Developers
+# SPDX-FileCopyrightText: 2024 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 name        : pineapple
@@ -7,7 +7,7 @@ release     : 1
 summary     : Delicious slices of pineapples
 description : Can I be on your pizza?
 license     : Zlib
-homepage    : https://github.com/AerynOS
+homepage    : https://github.com/aerynOS
 install     : |
     mkdir -p %(installroot)/%(vendordir)
     touch %(installroot)/%(vendordir)/pienapple

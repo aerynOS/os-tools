@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023 AerynOS Developers
+# SPDX-FileCopyrightText: 2023 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 # TODO: Split out clang/etc and build statically against llvm package!
@@ -67,9 +67,9 @@ setup       : |
     unset LD_PRELOAD
     %patch %(pkgdir)/aerynos/0001-Support-aerynos-as-a-distro.patch
     %patch %(pkgdir)/perf/0001-Reduce-GCC-startup-searches.patch
-    %patch %(pkgdir)/aerynos/0001-Use-correct-AerynOS-multilib-paths-for-ld.patch
+    %patch %(pkgdir)/aerynos/0001-Use-correct-aerynOS-multilib-paths-for-ld.patch
     %patch %(pkgdir)/aerynos/0001-Make-gnu-hash-the-default-for-lld-and-clang.patch
-    %patch %(pkgdir)/aerynos/0001-Update-binutils-version-to-match-AerynOS.patch
+    %patch %(pkgdir)/aerynos/0001-Update-binutils-version-to-match-aerynOS.patch
     %patch %(pkgdir)/aerynos/0001-Make-external-visibility-default.patch
 
     %cmake ${llvmopts} -S llvm \

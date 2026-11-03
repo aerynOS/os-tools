@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 AerynOS Developers
+// SPDX-FileCopyrightText: 2023 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 pub const NAME: &str = env!("CARGO_PKG_NAME");

@@ -1,10 +1,10 @@
-# SPDX-FileCopyrightText: 2024 AerynOS Developers
+# SPDX-FileCopyrightText: 2024 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 name       : boulder-concurrency-test
 version    : 1
 release    : 1
-homepage   : https://github.com/AerynOS/os-tools
+homepage   : https://github.com/aerynOS/os-tools
 summary    : Concurrency test for boulder
 description: Concurrency test for boulder
 license    :

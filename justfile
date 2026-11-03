@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 AerynOS Developers
+# SPDX-FileCopyrightText: 2024 aerynOS Developers
 # SPDX-License-Identifier: MPL-2.0
 
 # The default task is to build moss
@@ -58,7 +58,7 @@ get-started: (build "boulder") (build "moss") (licenses)
   command -v moss
   echo ""
   echo "Done."
-  echo "The Aeryn OS documentation lives at https://aerynos.dev"
+  echo "The aerynOS documentation lives at https://aerynos.com/aerynos"
 
 # Fix code issues
 fix:

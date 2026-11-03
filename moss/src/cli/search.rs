@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 AerynOS Developers
+// SPDX-FileCopyrightText: 2024 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 use std::collections::BTreeMap;
@@ -226,7 +226,7 @@ mod tests {
         }
     }
 
-    /// Build a test registry populated with real packages from the AerynOS recipes.
+    /// Build a test registry populated with real packages from the aerynOS recipes.
     /// Package names, summaries, and provider metadata are sourced from stone.yaml
     /// and manifest.x86_64.jsonc files in the recipes repository.
     fn test_registry() -> Registry {

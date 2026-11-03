@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 AerynOS Developers
+// SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 //! [ScriptEnv] is used to store the immutable environment that a script runs in

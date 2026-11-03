@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2023 AerynOS Developers
-// SPDX-FileCopyrightText: 2023 AerynOS Developers
+// SPDX-FileCopyrightText: 2023 aerynOS Developers
+// SPDX-FileCopyrightText: 2023 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 //! The core client implementation for the moss package manager
@@ -1007,7 +1007,7 @@ fn record_os_release(root: &Path) -> Result<(), Error> {
                 VERSION_CODENAME={version}
                 VERSION_ID="{version}"
                 PRETTY_NAME="Unbranded OS {version} - I forgot to add os-info.json"
-                HOME_URL="https://github.com/AerynOS/os-info"
+                HOME_URL="https://github.com/aerynOS/os-info"
                 BUG_REPORT_URL="https://.com""#,
                 version = "no-os-info.json"
             )
