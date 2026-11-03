@@ -105,7 +105,7 @@ moss -D aosroot/ repo add volatile https://cdn.aerynos.dev --root-index channel=
 # List available packages
 moss -D aosroot/ pkg list --available
 
-# Install packages with moss
+# Add packages to your system with moss
 moss -D aosroot/ pkg add systemd bash libx11-32bit
 
 # A full list of commands can be found by typing `moss --help`
