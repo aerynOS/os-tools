@@ -20,7 +20,7 @@ This approach allows `moss` to efficiently keep all package contents for many tr
 
 ### boulder
 
-`boulder` is the native aerynOS builder tooling to turn upstream software into native aerynOS `.stone `packages via strongly defined YAML recipes. It uses rootless Linux containers to isolate package builds from the host system. `boulder` automatically populates recipes with as much metadata as it can within recipes to simplify the overall packaging process allowing packagers to pick up the remaining packaging work that cannot be automated away.
+`boulder` is the native aerynOS builder tooling to turn upstream software into native aerynOS `.stone `packages via strongly defined YAML recipes. It uses rootless Linux containers to isolate package builds from the host system. `boulder` automatically populates recipes with as much metadata as it can in order to simplify the overall packaging process, freeing packagers up to focus on the remaining packaging work that cannot be trivially automated away.
 
 ### `.stone`
 
