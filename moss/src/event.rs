@@ -7,6 +7,7 @@
 //! present them, such as progress bars, json or nothing at all. This also gives
 //! users a typed API instead of text to parse.
 
+pub mod pkg_extract;
 pub mod pkg_fetch;
 mod publisher;
 mod subscriber;
@@ -21,14 +22,18 @@ use derive_more::Display;
 use serde::Serialize;
 
 // Local Crate Imports
+use pkg_extract::PkgExtract;
 use pkg_fetch::PkgFetch;
 
 // Public API ==========================================================================================================
 
+// NOTE: By convention, `*Task` variants are leaves of the event tree that always take an `Update` — nesting is handled
+// by the non-Task-suffixed variants
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
     PkgFetch(PkgFetch),
+    PkgExtract(PkgExtract),
 }
 
 /// A single update about a task

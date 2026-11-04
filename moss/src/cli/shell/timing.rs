@@ -11,6 +11,7 @@ use moss::{
     Event,
     event::{
         self, Update,
+        pkg_extract::{ExtractPackages, PkgExtract},
         pkg_fetch::{FetchPackages, PkgFetch},
         task,
     },
@@ -44,21 +45,39 @@ enum End {
     Aborted,
 }
 
+// FIXME: Unnest these?
 impl event::Subscriber for Timing {
     fn event(&self, event: &Event) {
         match event {
-            // FIXME: Unnest these?
-            Event::PkgFetch(PkgFetch::FetchPackagesTask(update)) => {
-                self.task(update, "fetch_packages", |task| format!("{} packages", task.count));
-            }
-            Event::PkgFetch(PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update))) => {
-                self.task(update, "fetch_package", |task| task.name.to_string());
-            }
+            Event::PkgFetch(subevent) => self.pkg_fetch(subevent),
+            Event::PkgExtract(subevent) => self.pkg_extract(subevent),
         }
     }
 }
 
 impl Timing {
+    fn pkg_fetch(&self, event: &PkgFetch) {
+        match event {
+            PkgFetch::FetchPackagesTask(update) => {
+                self.task(update, "fetch_packages", |task| format!("{} packages", task.count));
+            }
+            PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update)) => {
+                self.task(update, "fetch_package", |task| task.name.to_string());
+            }
+        }
+    }
+
+    fn pkg_extract(&self, event: &PkgExtract) {
+        match event {
+            PkgExtract::ExtractPackagesTask(update) => {
+                self.task(update, "extract_packages", |task| format!("{} packages", task.count));
+            }
+            PkgExtract::ExtractPackages(ExtractPackages::ExtractPackageTask(update)) => {
+                self.task(update, "extract_package", |task| task.path.display().to_string());
+            }
+        }
+    }
+
     fn task<I, O, D>(&self, update: &Update<I, O, D>, name: &'static str, label: impl FnOnce(&I) -> String) {
         let now = Instant::now();
         let mut tasks = self.tasks.lock().unwrap();

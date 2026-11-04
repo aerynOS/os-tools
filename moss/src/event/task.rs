@@ -63,6 +63,12 @@ impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
         self.finished = true;
         self.publish_update(Update::Completed { id, output });
     }
+
+    pub fn report_detail(&self, detail: D) {
+        let id = self.id;
+
+        self.publish_update(Update::Detail { id, detail });
+    }
 }
 
 impl<'p, I, O, D, E> Drop for Task<'p, I, O, D, E> {

@@ -12,19 +12,35 @@ use thiserror::Error;
 use tui::{ProgressBar, ProgressStyle};
 
 use crate::{
-    Installation,
+    Client, Event, Installation,
     client::{self, cache::asset_path},
+    event::{
+        self,
+        pkg_extract::{self, ExtractPackages, PkgExtract},
+    },
     fstree, installation,
     package::{self, MissingMetaFieldError},
     util,
 };
 
-pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
+/// Extract the contents of stone files into `output_dir`, one directory per package
+///
+/// Progress is reported to `publisher`
+pub fn extract(client: &Client, stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
     let installation = Installation::open(Path::new("."), None)?;
 
     util::ensure_dir_exists(output_dir)?;
 
     let output_dir = output_dir.canonicalize()?;
+
+    let pkg_extract_scope = client.events.root_scope(Event::PkgExtract);
+    let extract_packages_task = pkg_extract_scope.start_task(
+        PkgExtract::ExtractPackagesTask,
+        pkg_extract::PackagesInfo {
+            count: stones.len() as u64,
+        },
+    );
+    let progress = extract_packages_task.start_progress(Some(stones.len() as u64), event::Unit::Items);
 
     for path in stones {
         let rdr = File::open(path).map_err(Error::IO)?;
@@ -39,7 +55,8 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
             .ok_or(Error::MissingMeta)?;
 
         let Some(layouts) = layouts else {
-            println!("{path:?}: No layout records found, skipping.");
+            extract_packages_task.report_detail(pkg_extract::PackagesDetail::Skipped { path: path.to_owned() });
+            progress.increment(1);
             continue;
         };
 
@@ -47,7 +64,14 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
         let pkg_id = package::Id::from(pkg.id());
         let extraction_root = output_dir.join(pkg_id.to_string());
 
-        println!("Extract: {path:?} -> {extraction_root:?}");
+        let extract_packages_scope = extract_packages_task.child_scope(PkgExtract::ExtractPackages);
+        let extract_package = extract_packages_scope.start_task(
+            ExtractPackages::ExtractPackageTask,
+            pkg_extract::PackageInfo {
+                path: path.to_owned(),
+                root: extraction_root.clone(),
+            },
+        );
 
         // Cleanup old extraction root
         util::recreate_dir(&extraction_root)?;
@@ -116,10 +140,15 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
         let vfs = fstree::vfs(records).map_err(Error::BuildVfsTree)?;
 
         fstree::native::blit_root(&installation, &vfs, &extraction_root.canonicalize()?).map_err(Error::BlitFstree)?;
+
+        extract_package.complete_task(());
+        progress.increment(1);
     }
 
     // Clean up transient .moss install
     fs::remove_dir_all(installation.root.join(".moss"))?;
+
+    extract_packages_task.complete_task(());
 
     Ok(())
 }

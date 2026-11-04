@@ -7,6 +7,7 @@ use moss::{
     Event,
     event::{
         self,
+        pkg_extract::{self, ExtractPackages, PkgExtract},
         pkg_fetch::{self, FetchPackages, PkgFetch},
         task,
     },
@@ -28,17 +29,28 @@ struct TaskProgress {
 
 impl event::Subscriber for Human {
     fn event(&self, event: &Event) {
-        // FIXME: Unnest these?
         match event {
-            Event::PkgFetch(PkgFetch::FetchPackagesTask(update)) => self.fetch_packages(update),
-            Event::PkgFetch(PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update))) => {
-                self.fetch_package(update);
-            }
+            Event::PkgFetch(subevent) => self.pkg_fetch(subevent),
+            Event::PkgExtract(subevent) => self.pkg_extract(subevent),
         }
     }
 }
 
 impl Human {
+    fn pkg_fetch(&self, event: &PkgFetch) {
+        match event {
+            PkgFetch::FetchPackagesTask(update) => self.fetch_packages(update),
+            PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update)) => self.fetch_package(update),
+        }
+    }
+
+    fn pkg_extract(&self, event: &PkgExtract) {
+        match event {
+            PkgExtract::ExtractPackagesTask(update) => self.extract_packages(update),
+            PkgExtract::ExtractPackages(ExtractPackages::ExtractPackageTask(update)) => self.extract_package(update),
+        }
+    }
+
     fn fetch_packages(&self, update: &event::Update<pkg_fetch::PackagesInfo>) {
         match update {
             event::Update::Started { id, info, .. } => {
@@ -103,6 +115,22 @@ impl Human {
                 self.remove(*id);
             }
             event::Update::Detail { .. } => {}
+        }
+    }
+
+    fn extract_packages(&self, update: &event::Update<pkg_extract::PackagesInfo, (), pkg_extract::PackagesDetail>) {
+        if let event::Update::Detail {
+            detail: pkg_extract::PackagesDetail::Skipped { path },
+            ..
+        } = update
+        {
+            println!("{path:?}: No layout records found, skipping.");
+        }
+    }
+
+    fn extract_package(&self, update: &event::Update<pkg_extract::PackageInfo>) {
+        if let event::Update::Started { info, .. } = update {
+            println!("Extract: {:?} -> {:?}", info.path, info.root);
         }
     }
 

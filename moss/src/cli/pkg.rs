@@ -31,7 +31,7 @@ impl Command {
             Subcommand::Add(args) => add(global, args, installation),
             Subcommand::Info(args) => info(args, installation),
             Subcommand::List(args) => list(args, installation),
-            Subcommand::Extract { files, output_dir } => extract(files, output_dir, installation),
+            Subcommand::Extract { files, output_dir } => extract(global, files, output_dir, installation),
             Subcommand::Remove(args) => remove(global, args, installation),
         }
     }
@@ -228,10 +228,18 @@ fn remove(global: Global, args: RemoveArgs, installation: Installation) -> Resul
 }
 
 /// Handle execution of `moss pkg extract`
-fn extract(files: Vec<PathBuf>, output_dir: PathBuf, installation: Installation) -> Result<(), Error> {
+fn extract(global: Global, files: Vec<PathBuf>, output_dir: PathBuf, installation: Installation) -> Result<(), Error> {
     let paths_ref = files.iter().collect();
 
-    let client = Client::new(environment::NAME, installation)?;
+    let client = Client::builder(environment::NAME, installation).subscriber(global.format.subscriber());
+
+    // TODO: Construct `Subscriber`s once in `cli.rs` instead of separately in every command
+    let client = if global.timing {
+        client.subscriber(Box::new(Timing::default()))
+    } else {
+        client
+    }
+    .build()?;
 
     client.extract(paths_ref, &output_dir)?;
     Ok(())

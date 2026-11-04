@@ -210,7 +210,7 @@ impl Client {
 
     /// Perform package extractions
     pub fn extract(&self, stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
-        extract(stones, output_dir).map_err(|error| Error::Extract(Box::new(error)))
+        extract(self, stones, output_dir).map_err(|error| Error::Extract(Box::new(error)))
     }
 
     /// Perform a sync

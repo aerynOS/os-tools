@@ -10,8 +10,6 @@ use crate::{event::Update, package};
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PkgFetch {
-    // NOTE: By convention, `*Task` variants are leaves of the event tree that always take an `Update` — nesting is
-    // handled by the non-Task-suffixed variants
     FetchPackagesTask(Update<PackagesInfo>),
     FetchPackages(FetchPackages),
 }
