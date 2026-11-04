@@ -9,15 +9,15 @@ use std::{
 
 use futures_util::{StreamExt, TryStreamExt, stream};
 use thiserror::Error;
-use tracing::{info, info_span, instrument};
+use tracing::{info, instrument};
 use tui::{
-    MultiProgress, ProgressBar, ProgressStyle, Styled,
+    Styled,
     pretty::{ColumnDisplay, autoprint_columns},
 };
 use url::{ParseError, Url};
 
 use crate::{
-    Client, Package, Provider, client, environment,
+    Client, Package, Provider, client, environment, event,
     package::{self, Flags, Meta},
     request, runtime, util,
 };
@@ -51,43 +51,17 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
     instant = Instant::now();
 
-    let cache_packages_span = info_span!("progress", phase = "cache_packages", event_type = "progress");
-    let _cache_packages_guard = cache_packages_span.enter();
-    info!(
-        total_items = total_packages,
-        progress = 0.0,
-        event_type = "progress_start"
-    );
-
-    let multi_progress = MultiProgress::new();
-
-    // Add bar to track total package counts
-    let total_progress = multi_progress.add(
-        ProgressBar::new(total_packages as u64).with_style(
-            ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
-                .unwrap()
-                .progress_chars("■≡=- "),
-        ),
-    );
-    total_progress.tick();
+    let fetch_packages = client.events.start_task(event::task::FetchPackages {
+        count: total_packages as u64,
+    });
+    let total_progress = fetch_packages.start_progress(Some(total_packages as u64), event::task::Unit::Items);
 
     runtime::block_on(async {
         let stream = stream::iter(&input).map(|pkg| async {
-            let download_size = pkg.meta.download_size.unwrap_or_default();
-
-            let progress_bar = multi_progress.insert_before(
-                &total_progress,
-                ProgressBar::new(download_size)
-                    .with_message(format!("{} {}", "Downloading".blue(), pkg.meta.name.as_str().bold(),))
-                    .with_style(
-                        ProgressStyle::with_template(
-                            " {spinner} |{percent:>3}%| {wide_msg} {binary_bytes_per_sec:>.dim} ",
-                        )
-                        .unwrap()
-                        .tick_chars("--=≡■≡=--"),
-                    ),
-            );
-            progress_bar.enable_steady_tick(Duration::from_millis(150));
+            let fetch_package = fetch_packages.start_subtask(event::task::FetchPackage {
+                name: pkg.meta.name.clone(),
+            });
+            let progress = fetch_package.start_progress(pkg.meta.download_size, event::task::Unit::Bytes);
 
             let uri = Url::parse(
                 pkg.meta
@@ -102,38 +76,11 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
             let dest_path = output_dir.join(file_name);
 
-            request::download_with_progress(uri, &dest_path, |progress| {
-                progress_bar.inc(progress.delta);
-                info!(
-                    progress = progress.completed as f32 / download_size as f32,
-                    current = progress.completed as usize,
-                    total = download_size as usize,
-                    event_type = "progress_update",
-                    "Downloading {}",
-                    pkg.meta.name
-                );
-            })
-            .await
-            .map_err(|err| Error::FetchPackage(err, pkg.meta.name.clone()))?;
+            request::download_with_progress(uri, &dest_path, |download| progress.set(download.completed))
+                .await
+                .map_err(|err| Error::FetchPackage(err, pkg.meta.name.clone()))?;
 
-            progress_bar.finish();
-            multi_progress.remove(&progress_bar);
-
-            multi_progress.suspend(|| {
-                // Print the relative instead of absolute path to user
-                let path_to_print = if let Ok(cwd) = std::env::current_dir() {
-                    dest_path.strip_prefix(cwd).ok().unwrap_or(&dest_path)
-                } else {
-                    &dest_path
-                };
-
-                println!(
-                    "{} {} {}",
-                    "Fetched".green(),
-                    pkg.meta.name.to_string().bold(),
-                    path_to_print.display()
-                );
-            });
+            fetch_package.complete_task(event::task::FetchedPackage { path: dest_path });
 
             total_progress.inc(1);
 
@@ -145,13 +92,9 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
         buffered.try_collect::<()>().await
     })?;
 
+    fetch_packages.complete_task(());
+
     timing.fetch = instant.elapsed();
-    info!(
-        duration_ms = timing.fetch.as_millis(),
-        items_processed = total_packages,
-        progress = 1.0,
-        event_type = "progress_completed",
-    );
 
     Ok(timing)
 }

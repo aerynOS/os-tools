@@ -17,6 +17,10 @@ use serde::Serialize;
 
 use super::Sink;
 
+pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
+
+mod fetch;
+
 /// Identifies a task, unique across the whole process
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct Id(u64);
@@ -47,7 +51,10 @@ pub trait Task: fmt::Debug + Serialize + Sized {
 /// An [`Update`] about one of moss's tasks
 #[derive(Debug, Serialize)]
 #[serde(tag = "task", rename_all = "snake_case")]
-pub enum Event {}
+pub enum Event {
+    FetchPackages(Update<FetchPackages>),
+    FetchPackage(Update<FetchPackage>),
+}
 
 /// A single update about a task
 ///
