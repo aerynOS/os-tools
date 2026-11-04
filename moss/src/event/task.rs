@@ -67,6 +67,47 @@ pub enum Event {
     Blit(Update<Blit>),
 }
 
+impl Event {
+    /// The task this update is about
+    pub fn id(&self) -> Id {
+        match self {
+            Event::FetchPackages(update) => update.id(),
+            Event::FetchPackage(update) => update.id(),
+            Event::IndexPackages(update) => update.id(),
+            Event::IndexPackage(update) => update.id(),
+            Event::ExtractPackages(update) => update.id(),
+            Event::ExtractPackage(update) => update.id(),
+            Event::Blit(update) => update.id(),
+        }
+    }
+
+    /// Whether this is an [`Update::Progress`]
+    pub fn is_progress(&self) -> bool {
+        match self {
+            Event::FetchPackages(update) => update.is_progress(),
+            Event::FetchPackage(update) => update.is_progress(),
+            Event::IndexPackages(update) => update.is_progress(),
+            Event::IndexPackage(update) => update.is_progress(),
+            Event::ExtractPackages(update) => update.is_progress(),
+            Event::ExtractPackage(update) => update.is_progress(),
+            Event::Blit(update) => update.is_progress(),
+        }
+    }
+
+    /// Whether this is the last update about the task
+    pub fn is_finished(&self) -> bool {
+        match self {
+            Event::FetchPackages(update) => update.is_finished(),
+            Event::FetchPackage(update) => update.is_finished(),
+            Event::IndexPackages(update) => update.is_finished(),
+            Event::IndexPackage(update) => update.is_finished(),
+            Event::ExtractPackages(update) => update.is_finished(),
+            Event::ExtractPackage(update) => update.is_finished(),
+            Event::Blit(update) => update.is_finished(),
+        }
+    }
+}
+
 /// A single update about a task
 ///
 /// A task always sends [`Update::Started`] first and either [`Update::Completed`]
@@ -98,6 +139,30 @@ pub enum Update<T: Task> {
     Completed { id: Id, outcome: T::Outcome },
     /// The task stopped before finishing, such as from an error
     Aborted { id: Id },
+}
+
+impl<T: Task> Update<T> {
+    /// The task this update is about
+    pub fn id(&self) -> Id {
+        match self {
+            Update::Started { id, .. }
+            | Update::Phase { id, .. }
+            | Update::Progress { id, .. }
+            | Update::Detail { id, .. }
+            | Update::Completed { id, .. }
+            | Update::Aborted { id } => *id,
+        }
+    }
+
+    /// Whether this is an [`Update::Progress`]
+    pub fn is_progress(&self) -> bool {
+        matches!(self, Update::Progress { .. })
+    }
+
+    /// Whether this is the last update about the task
+    pub fn is_finished(&self) -> bool {
+        matches!(self, Update::Completed { .. } | Update::Aborted { .. })
+    }
 }
 
 /// What an [`Update::Progress`] counts

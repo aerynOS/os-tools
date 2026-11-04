@@ -28,7 +28,7 @@ impl Format {
     pub fn observer(self) -> Arc<dyn event::Observer> {
         match self {
             Format::Human => Arc::new(Human::default()),
-            Format::Json => Arc::new(Json),
+            Format::Json => Arc::new(Json::default()),
         }
     }
 }
