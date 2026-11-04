@@ -4,6 +4,7 @@
 use std::{
     io::{self, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use fs_err::{self as fs, File};
@@ -14,17 +15,27 @@ use tui::{ProgressBar, ProgressStyle};
 use crate::{
     Installation,
     client::{self, cache::asset_path},
+    event::{self, Sink, task},
     fstree, installation,
     package::{self, MissingMetaFieldError},
     util,
 };
 
-pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
+/// Extract the contents of stone files into `output_dir`, one directory per package
+///
+/// Progress is reported to `observer`
+pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path, observer: Arc<dyn event::Observer>) -> Result<(), Error> {
     let installation = Installation::open(Path::new("."), None)?;
 
     util::ensure_dir_exists(output_dir)?;
 
     let output_dir = output_dir.canonicalize()?;
+
+    let events = Sink::new(observer);
+    let extract_packages = events.start_task(task::ExtractPackages {
+        count: stones.len() as u64,
+    });
+    let progress = extract_packages.start_progress(Some(stones.len() as u64), task::Unit::Items);
 
     for path in stones {
         let rdr = File::open(path).map_err(Error::IO)?;
@@ -39,7 +50,8 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
             .ok_or(Error::MissingMeta)?;
 
         let Some(layouts) = layouts else {
-            println!("{path:?}: No layout records found, skipping.");
+            extract_packages.report_detail(task::ExtractPackagesDetail::Skipped { path: path.to_owned() });
+            progress.inc(1);
             continue;
         };
 
@@ -47,7 +59,10 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
         let pkg_id = package::Id::from(pkg.id());
         let extraction_root = output_dir.join(pkg_id.to_string());
 
-        println!("Extract: {path:?} -> {extraction_root:?}");
+        let extract_package = extract_packages.start_subtask(task::ExtractPackage {
+            path: path.to_owned(),
+            root: extraction_root.clone(),
+        });
 
         // Cleanup old extraction root
         util::recreate_dir(&extraction_root)?;
@@ -116,10 +131,15 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
         let vfs = fstree::vfs(records).map_err(Error::BuildVfsTree)?;
 
         fstree::native::blit_root(&installation, &vfs, &extraction_root.canonicalize()?).map_err(Error::BlitFstree)?;
+
+        extract_package.complete_task(());
+        progress.inc(1);
     }
 
     // Clean up transient .moss install
     fs::remove_dir_all(installation.root.join(".moss"))?;
+
+    extract_packages.complete_task(());
 
     Ok(())
 }

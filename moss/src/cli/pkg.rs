@@ -31,7 +31,7 @@ impl Command {
             Subcommand::Add(args) => add(global, args, installation),
             Subcommand::Info(args) => info(args, installation),
             Subcommand::List(args) => list(args, installation),
-            Subcommand::Extract { files, output_dir } => extract(files, output_dir),
+            Subcommand::Extract { files, output_dir } => extract(global, files, output_dir),
             Subcommand::Remove(args) => remove(global, args, installation),
         }
     }
@@ -222,8 +222,8 @@ fn remove(global: Global, args: RemoveArgs, installation: Installation) -> Resul
 }
 
 /// Handle execution of `moss pkg extract`
-fn extract(files: Vec<PathBuf>, output_dir: PathBuf) -> Result<(), Error> {
+fn extract(global: Global, files: Vec<PathBuf>, output_dir: PathBuf) -> Result<(), Error> {
     let paths_ref = files.iter().collect();
-    client::extract(paths_ref, &output_dir)?;
+    client::extract(paths_ref, &output_dir, global.format.observer())?;
     Ok(())
 }

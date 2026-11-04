@@ -17,9 +17,11 @@ use serde::Serialize;
 
 use super::Sink;
 
+pub use self::extract::{ExtractPackage, ExtractPackages, ExtractPackagesDetail};
 pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
 pub use self::index::{IndexPackage, IndexPackagePhase, IndexPackages, IndexPackagesPhase, IndexedPackages};
 
+mod extract;
 mod fetch;
 mod index;
 
@@ -58,6 +60,8 @@ pub enum Event {
     FetchPackage(Update<FetchPackage>),
     IndexPackages(Update<IndexPackages>),
     IndexPackage(Update<IndexPackage>),
+    ExtractPackages(Update<ExtractPackages>),
+    ExtractPackage(Update<ExtractPackage>),
 }
 
 /// A single update about a task
@@ -135,6 +139,11 @@ impl<T: Task> Handle<T> {
     /// Report that the task moved to a new phase
     pub fn enter_phase(&self, phase: T::Phase) {
         emit(&self.sink, Update::<T>::Phase { id: self.id, phase });
+    }
+
+    /// Report a fact found or decided while the task runs
+    pub fn report_detail(&self, detail: T::Detail) {
+        emit(&self.sink, Update::<T>::Detail { id: self.id, detail });
     }
 
     /// Start reporting progress towards `total`, beginning at zero

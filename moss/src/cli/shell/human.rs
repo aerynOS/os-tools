@@ -29,6 +29,8 @@ impl event::Observer for Human {
             Event::Task(task::Event::FetchPackage(update)) => self.fetch_package(update),
             Event::Task(task::Event::IndexPackages(update)) => self.index_packages(update),
             Event::Task(task::Event::IndexPackage(update)) => self.index_package(update),
+            Event::Task(task::Event::ExtractPackages(update)) => self.extract_packages(update),
+            Event::Task(task::Event::ExtractPackage(update)) => self.extract_package(update),
         }
     }
 }
@@ -211,6 +213,32 @@ impl Human {
                 self.remove(*id);
             }
             task::Update::Detail { .. } => {}
+        }
+    }
+
+    fn extract_packages(&self, update: &task::Update<task::ExtractPackages>) {
+        match update {
+            task::Update::Detail { detail, .. } => match detail {
+                task::ExtractPackagesDetail::Skipped { path } => {
+                    println!("{path:?}: No layout records found, skipping.");
+                }
+            },
+            task::Update::Started { .. }
+            | task::Update::Phase { .. }
+            | task::Update::Progress { .. }
+            | task::Update::Completed { .. }
+            | task::Update::Aborted { .. } => {}
+        }
+    }
+
+    fn extract_package(&self, update: &task::Update<task::ExtractPackage>) {
+        match update {
+            task::Update::Started { task, .. } => println!("Extract: {:?} -> {:?}", task.path, task.root),
+            task::Update::Phase { .. }
+            | task::Update::Progress { .. }
+            | task::Update::Detail { .. }
+            | task::Update::Completed { .. }
+            | task::Update::Aborted { .. } => {}
         }
     }
 
