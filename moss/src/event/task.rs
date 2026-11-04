@@ -17,10 +17,12 @@ use serde::Serialize;
 
 use super::Sink;
 
+pub use self::blit::{Blit, BlittedTree};
 pub use self::extract::{ExtractPackage, ExtractPackages, ExtractPackagesDetail};
 pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
 pub use self::index::{IndexPackage, IndexPackagePhase, IndexPackages, IndexPackagesPhase, IndexedPackages};
 
+mod blit;
 mod extract;
 mod fetch;
 mod index;
@@ -62,6 +64,7 @@ pub enum Event {
     IndexPackage(Update<IndexPackage>),
     ExtractPackages(Update<ExtractPackages>),
     ExtractPackage(Update<ExtractPackage>),
+    Blit(Update<Blit>),
 }
 
 /// A single update about a task
@@ -118,10 +121,17 @@ pub struct Handle<T: Task> {
 }
 
 impl<T: Task> Handle<T> {
-    pub(super) fn new(sink: Sink, parent: Option<Id>, task: T) -> Self {
+    pub(super) fn new(sink: Sink, task: T) -> Self {
         let id = Id::next();
 
-        emit(&sink, Update::Started { id, parent, task });
+        emit(
+            &sink,
+            Update::Started {
+                id,
+                parent: sink.parent(),
+                task,
+            },
+        );
 
         Self {
             id,
@@ -131,9 +141,14 @@ impl<T: Task> Handle<T> {
         }
     }
 
+    /// A sink that nests anything started from it under this task
+    pub fn child_sink(&self) -> Sink {
+        self.sink.with_parent(self.id)
+    }
+
     /// Start a task nested under this one
     pub fn start_subtask<S: Task>(&self, task: S) -> Handle<S> {
-        Handle::new(self.sink.clone(), Some(self.id), task)
+        self.child_sink().start_task(task)
     }
 
     /// Report that the task moved to a new phase

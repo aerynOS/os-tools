@@ -838,7 +838,7 @@ impl Client {
 
         let fstree = self.vfs(packages)?;
 
-        fstree::native::blit_root(&self.installation, &fstree, &blit_target).map_err(Error::Blit)?;
+        fstree::native::blit_root(&self.installation, &fstree, &blit_target, &self.events).map_err(Error::Blit)?;
 
         Ok(fstree)
     }

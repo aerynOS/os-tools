@@ -31,6 +31,7 @@ impl event::Observer for Human {
             Event::Task(task::Event::IndexPackage(update)) => self.index_package(update),
             Event::Task(task::Event::ExtractPackages(update)) => self.extract_packages(update),
             Event::Task(task::Event::ExtractPackage(update)) => self.extract_package(update),
+            Event::Task(task::Event::Blit(update)) => self.blit(update),
         }
     }
 }
@@ -239,6 +240,46 @@ impl Human {
             | task::Update::Detail { .. }
             | task::Update::Completed { .. }
             | task::Update::Aborted { .. } => {}
+        }
+    }
+
+    fn blit(&self, update: &task::Update<task::Blit>) {
+        match update {
+            task::Update::Started { id, .. } => {
+                let progress_bar = self.multi_progress.add(
+                    ProgressBar::new(1).with_style(
+                        ProgressStyle::with_template("\n|{bar:20.red/blue}| {pos}/{len} {msg}")
+                            .unwrap()
+                            .progress_chars("■≡=- "),
+                    ),
+                );
+                progress_bar.set_message("Blitting filesystem");
+                progress_bar.enable_steady_tick(Duration::from_millis(150));
+                progress_bar.tick();
+
+                self.insert(*id, progress_bar, String::new());
+            }
+            task::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
+            task::Update::Completed { id, outcome } => {
+                if let Some(task_progress) = self.remove(*id) {
+                    task_progress.progress_bar.finish_and_clear();
+                }
+
+                println!(
+                    "\n{} entries blitted in {} {}",
+                    outcome.entries.to_string().bold(),
+                    format!("{:.2}s", outcome.elapsed.as_secs_f32()).bold(),
+                    format!(
+                        "({:.1}k / s)",
+                        outcome.entries as f32 / outcome.elapsed.as_secs_f32() / 1_000.0
+                    )
+                    .dim()
+                );
+            }
+            task::Update::Aborted { id } => {
+                self.remove(*id);
+            }
+            task::Update::Phase { .. } | task::Update::Detail { .. } => {}
         }
     }
 

@@ -130,7 +130,13 @@ pub fn extract(stones: Vec<&PathBuf>, output_dir: &Path, observer: Arc<dyn event
             .collect::<Vec<_>>();
         let vfs = fstree::vfs(records).map_err(Error::BuildVfsTree)?;
 
-        fstree::native::blit_root(&installation, &vfs, &extraction_root.canonicalize()?).map_err(Error::BlitFstree)?;
+        fstree::native::blit_root(
+            &installation,
+            &vfs,
+            &extraction_root.canonicalize()?,
+            &extract_package.child_sink(),
+        )
+        .map_err(Error::BlitFstree)?;
 
         extract_package.complete_task(());
         progress.inc(1);
