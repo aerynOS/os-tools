@@ -23,6 +23,7 @@ mod pkg;
 mod repo;
 mod search;
 mod search_file;
+mod shell;
 mod state;
 mod sync;
 mod tree;
@@ -290,6 +291,15 @@ struct Global {
         global = true
     )]
     log: Option<String>,
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        default_value_t,
+        help = "Output format",
+        help_heading = "Global Options"
+    )]
+    format: shell::Format,
     #[arg(
         short = 'y',
         long = "yes",
