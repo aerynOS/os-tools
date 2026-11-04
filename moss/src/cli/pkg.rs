@@ -173,7 +173,9 @@ fn fetch(
 ) -> Result<(), Error> {
     let pkgs = providers.iter().map(|prov| prov.to_string()).collect::<Vec<_>>();
 
-    let mut client = Client::new(environment::NAME, installation)?;
+    let mut client = Client::builder(environment::NAME, installation)
+        .observer(global.format.observer())
+        .build()?;
 
     // FIXME: Maybe we want client.fetch to accept Providers?
     // It's already using them internally.

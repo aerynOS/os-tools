@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 use astr::AStr;
 use derive_more::{Debug, Display, From, Into};
+use serde::Serialize;
 use stone::{StonePayloadMetaPrimitive, StonePayloadMetaRecord, StonePayloadMetaTag};
 use thiserror::Error;
 
@@ -16,7 +17,7 @@ use crate::{Dependency, Provider, dependency};
 pub struct Id(pub(super) AStr);
 
 /// The name of a [`super::Package`]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Into, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Into, Display, Serialize)]
 pub struct Name(String);
 
 impl Name {
