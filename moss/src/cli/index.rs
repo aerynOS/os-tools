@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use clap::Parser;
 use moss::client::index::Error;
 
+use crate::cli::Global;
+
 #[derive(Debug, Parser)]
 #[command(about = "Index a collection of moss-format packages")]
 pub struct Command {
@@ -28,7 +30,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn handle(self) -> Result<(), Error> {
+    pub fn handle(self, global: Global) -> Result<(), Error> {
         // moss::client::index expects absolute paths.
         let input_dir = &self.input_dir.canonicalize()?;
         let output_dir = if let Some(out) = &self.output_dir {
@@ -37,7 +39,7 @@ impl Command {
             input_dir
         };
 
-        moss::client::index(input_dir, Some(output_dir))?;
+        moss::client::index(input_dir, Some(output_dir), global.format.observer())?;
 
         Ok(())
     }

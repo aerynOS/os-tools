@@ -18,8 +18,10 @@ use serde::Serialize;
 use super::Sink;
 
 pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
+pub use self::index::{IndexPackage, IndexPackagePhase, IndexPackages, IndexPackagesPhase, IndexedPackages};
 
 mod fetch;
+mod index;
 
 /// Identifies a task, unique across the whole process
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -54,6 +56,8 @@ pub trait Task: fmt::Debug + Serialize + Sized {
 pub enum Event {
     FetchPackages(Update<FetchPackages>),
     FetchPackage(Update<FetchPackage>),
+    IndexPackages(Update<IndexPackages>),
+    IndexPackage(Update<IndexPackage>),
 }
 
 /// A single update about a task
@@ -126,6 +130,11 @@ impl<T: Task> Handle<T> {
     /// Start a task nested under this one
     pub fn start_subtask<S: Task>(&self, task: S) -> Handle<S> {
         Handle::new(self.sink.clone(), Some(self.id), task)
+    }
+
+    /// Report that the task moved to a new phase
+    pub fn enter_phase(&self, phase: T::Phase) {
+        emit(&self.sink, Update::<T>::Phase { id: self.id, phase });
     }
 
     /// Start reporting progress towards `total`, beginning at zero

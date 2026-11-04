@@ -206,7 +206,7 @@ impl Command {
             Subcommand::Boot(cmd) => cmd.handle(installation)?,
             Subcommand::Cache(cmd) => cmd.handle(installation)?,
             Subcommand::Completions(cmd) => cmd.handle()?,
-            Subcommand::Index(cmd) => cmd.handle()?,
+            Subcommand::Index(cmd) => cmd.handle(self.global)?,
             Subcommand::Inspect(cmd) => cmd.handle()?,
             Subcommand::Pkg(cmd) => cmd.handle(self.global, installation)?,
             Subcommand::Repo(cmd) => cmd.handle(installation)?,
