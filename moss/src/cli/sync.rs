@@ -17,24 +17,36 @@ use crate::cli::{Confirmation, Global};
     about = "Sync package selections with candidates from the highest priority repository"
 )]
 pub struct Command {
-    /// Update repositories before syncing
-    #[arg(short, long)]
+    /// Whether to update repositories before syncing.
+    #[arg(short, long, help = "Update repositories before syncing")]
     update: bool,
-    /// Blit this sync to the provided directory instead of the root
-    ///
-    /// This operation won't be captured as a new state
-    #[arg(value_name = "dir", long = "to")]
+
+    /// Path where to blit the sync to. When None, it is assumed to be the root.
+    #[arg(
+        value_name = "dir",
+        long = "to",
+        help = concat!(
+            "Blit the sync to the provided directory instead of the root. ",
+            "This operation won't be captured as a new state"
+        )
+    )]
     blit_target: Option<PathBuf>,
 
-    /// Simulate the sync (dry-run)
-    #[arg(long)]
+    /// Sync must be only simulated.
+    #[arg(long, help = "Simulate the sync (dry-run)")]
     dry_run: bool,
 
-    /// Sync against the provided system-model.kdl
-    ///
-    /// Only the repositories and packages from the provided file
-    /// will be used to create the new state
-    #[arg(value_name = "file", long)]
+    /// Path of the system-model.kdl to import.
+    /// If provided, only the repositories and packages from the provided file
+    /// will be used to create the new state.
+    #[arg(
+        value_name = "file",
+        long,
+        help = concat!(
+            "Sync against the provided system-model.kdl. ",
+            "Only the repositories and packages from the provided file ",
+            "will be used to create the new state"
+        ))]
     import: Option<PathBuf>,
 }
 
