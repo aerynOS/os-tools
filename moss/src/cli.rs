@@ -6,10 +6,11 @@ use std::{
     io,
     ops::Deref,
     path::PathBuf,
+    sync::Arc,
 };
 
 use clap::{Args, CommandFactory, Parser};
-use moss::{Installation, client, installation};
+use moss::{Installation, client, event, installation};
 use stone::StoneReadError;
 use thiserror::Error;
 use tui::Styled;
@@ -202,24 +203,23 @@ impl Command {
             }
         }
 
-        match self.subcommand {
-            Subcommand::Boot(cmd) => cmd.handle(installation)?,
-            Subcommand::Cache(cmd) => cmd.handle(installation)?,
-            Subcommand::Completions(cmd) => cmd.handle()?,
-            Subcommand::Index(cmd) => cmd.handle(self.global)?,
-            Subcommand::Inspect(cmd) => cmd.handle()?,
-            Subcommand::Pkg(cmd) => cmd.handle(self.global, installation)?,
-            Subcommand::Repo(cmd) => cmd.handle(installation)?,
-            Subcommand::Search(cmd) => cmd.handle(installation)?,
-            Subcommand::SearchFile(cmd) => cmd.handle(installation)?,
-            Subcommand::State(cmd) => cmd.handle(self.global, installation)?,
-            Subcommand::Sync(cmd) => cmd.handle(self.global, installation)?,
-            Subcommand::Tree(cmd) => cmd.handle(),
+        let timing = self.global.timing.then(|| Arc::new(shell::Timing::default()));
 
-            Subcommand::Alias(_) => unreachable!(),
+        let observer = match &timing {
+            Some(timing) => Arc::new(event::observer::Tee::new([
+                self.global.format.observer(),
+                timing.clone(),
+            ])),
+            None => self.global.format.observer(),
+        };
+
+        let result = self.subcommand.run(self.global, installation, observer);
+
+        if let Some(timing) = timing {
+            timing.report();
         }
 
-        Ok(())
+        result
     }
 
     // Keep this list sorted for the binary search.
@@ -301,6 +301,13 @@ struct Global {
     )]
     format: shell::Format,
     #[arg(
+        long,
+        global = true,
+        help = "Print a timing report when finished",
+        help_heading = "Global Options"
+    )]
+    timing: bool,
+    #[arg(
         short = 'y',
         long = "yes",
         global = true,
@@ -342,6 +349,34 @@ enum Subcommand {
     /// for our alias-to-subcommands translator.
     #[command(external_subcommand)]
     Alias(Vec<OsString>),
+}
+
+impl Subcommand {
+    fn run(
+        self,
+        global: Global,
+        installation: Installation,
+        observer: Arc<dyn event::Observer>,
+    ) -> Result<(), BoxedError> {
+        match self {
+            Subcommand::Boot(cmd) => cmd.handle(installation)?,
+            Subcommand::Cache(cmd) => cmd.handle(installation)?,
+            Subcommand::Completions(cmd) => cmd.handle()?,
+            Subcommand::Index(cmd) => cmd.handle(observer)?,
+            Subcommand::Inspect(cmd) => cmd.handle()?,
+            Subcommand::Pkg(cmd) => cmd.handle(global, installation, observer)?,
+            Subcommand::Repo(cmd) => cmd.handle(installation)?,
+            Subcommand::Search(cmd) => cmd.handle(installation)?,
+            Subcommand::SearchFile(cmd) => cmd.handle(installation)?,
+            Subcommand::State(cmd) => cmd.handle(global, installation)?,
+            Subcommand::Sync(cmd) => cmd.handle(global, installation)?,
+            Subcommand::Tree(cmd) => cmd.handle(),
+
+            Subcommand::Alias(_) => unreachable!(),
+        }
+
+        Ok(())
+    }
 }
 
 impl From<bool> for Confirmation {

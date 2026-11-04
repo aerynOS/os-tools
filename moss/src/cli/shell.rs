@@ -9,9 +9,11 @@ use moss::event;
 
 pub use self::human::Human;
 pub use self::json::Json;
+pub use self::timing::Timing;
 
 mod human;
 mod json;
+mod timing;
 
 /// How events are written to stdout
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
