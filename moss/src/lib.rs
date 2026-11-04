@@ -3,6 +3,7 @@
 
 pub use self::client::{Client, ClientBuilder};
 pub use self::dependency::{Dependency, Provider};
+pub use self::event::Event;
 pub use self::installation::Installation;
 pub use self::package::Package;
 pub use self::registry::Registry;
@@ -15,6 +16,7 @@ pub mod client;
 pub mod db;
 pub mod dependency;
 pub mod environment;
+pub mod event;
 pub mod fstree;
 pub mod installation;
 pub mod package;
