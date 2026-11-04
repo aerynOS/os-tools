@@ -353,12 +353,12 @@ fn add_tuning(
     let toolchain = recipe.parsed.options.toolchain;
     let flags = tuning.build()?;
 
-    let mut cflags = fmt_flags(
+    let cflags = fmt_flags(
         flags
             .iter()
             .filter_map(|flag| flag.get(tuning::CompilerFlag::C, toolchain)),
     );
-    let mut cxxflags = fmt_flags(
+    let cxxflags = fmt_flags(
         flags
             .iter()
             .filter_map(|flag| flag.get(tuning::CompilerFlag::Cxx, toolchain)),
@@ -368,7 +368,7 @@ fn add_tuning(
             .iter()
             .filter_map(|flag| flag.get(tuning::CompilerFlag::F, toolchain)),
     );
-    let ldflags = fmt_flags(
+    let mut ldflags = fmt_flags(
         flags
             .iter()
             .filter_map(|flag| flag.get(tuning::CompilerFlag::Ld, toolchain)),
@@ -395,8 +395,7 @@ fn add_tuning(
     );
 
     if recipe.parsed.mold {
-        cflags.push_str(" -fuse-ld=mold");
-        cxxflags.push_str(" -fuse-ld=mold");
+        ldflags.push_str(" -fuse-ld=mold");
         rustflags.push_str(" -Clink-arg=-fuse-ld=mold");
     }
 
