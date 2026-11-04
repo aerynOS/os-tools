@@ -14,7 +14,7 @@ use tracing::instrument;
 mod info;
 mod list;
 
-use crate::cli::{Confirmation, Global};
+use crate::cli::{Confirmation, Global, shell::Timing};
 
 #[derive(Debug, Parser)]
 #[command(about = "Add, extract, fetch, list, remove, or show information about packages")]
@@ -173,9 +173,15 @@ fn fetch(
 ) -> Result<(), Error> {
     let pkgs = providers.iter().map(|prov| prov.to_string()).collect::<Vec<_>>();
 
-    let mut client = Client::builder(environment::NAME, installation)
-        .subscriber(global.format.subscriber())
-        .build()?;
+    let client = Client::builder(environment::NAME, installation).subscriber(global.format.subscriber());
+
+    // TODO: Construct `Subscriber`s once in `cli.rs` instead of separately in every command
+    let mut client = if global.timing {
+        client.subscriber(Box::new(Timing::default()))
+    } else {
+        client
+    }
+    .build()?;
 
     // FIXME: Maybe we want client.fetch to accept Providers?
     // It's already using them internally.

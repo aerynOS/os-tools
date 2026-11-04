@@ -308,6 +308,13 @@ struct Global {
     )]
     format: shell::Format,
     #[arg(
+        long,
+        global = true,
+        help = "Print a timing report when finished",
+        help_heading = "Global Options"
+    )]
+    timing: bool,
+    #[arg(
         short = 'y',
         long = "yes",
         global = true,
