@@ -62,6 +62,14 @@ impl Recipe {
             )));
         }
 
+        // We no longer support `+git` for git vcs patterns, only `~git`
+        if parsed.source.version.contains("+git") {
+            return Err(Error::Value(format!(
+                "git revisions must be of the form 'x.y.z~git.aabbccd' (found 'version: {}')",
+                parsed.source.version
+            )));
+        }
+
         // Setting release to 0 is a common mistake
         if parsed.source.release == 0 {
             return Err(Error::Value(format!(
