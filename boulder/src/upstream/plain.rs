@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+use container::Container;
 use fs_err as fs;
 use moss::{request, util};
 use sha2::{Digest, Sha256};
@@ -40,12 +41,14 @@ pub async fn fetch(url: Url, file_path: &Path, pb: &ProgressBar) -> Result<Hash,
 
 /// Extracts the source archive into the destination directory.
 /// The destination directory must exist.
-pub async fn extract(archive_path: &Path, dest_dir: &Path) -> Result<(), Error> {
+pub async fn extract(archive_path: &Path, dest_dir: &Path, strip_dirs: u8) -> Result<(), Error> {
     let output = Command::new("bsdtar")
         .arg("xf")
         .arg(archive_path)
         .arg("-C")
         .arg(dest_dir)
+        .arg("--strip-components")
+        .arg(strip_dirs.to_string())
         .output()
         .await?;
 
@@ -67,6 +70,8 @@ pub struct Plain {
     /// Name of the upstream when stored in the storage
     /// directory. If None, a default name is implied from [Self::url].
     pub rename: Option<String>,
+    /// Whether to extract the source archive into the build directory, or to share it as-is.
+    pub share_mode: ShareMode,
 }
 
 impl Plain {
@@ -115,6 +120,7 @@ impl Plain {
             name: self.name().to_owned(),
             path,
             was_cached: false,
+            share_mode: self.share_mode.clone(),
         })
     }
 
@@ -157,6 +163,7 @@ impl Plain {
             name: self.name().to_owned(),
             path,
             was_cached: true,
+            share_mode: self.share_mode.clone(),
         })
     }
 
@@ -191,22 +198,70 @@ pub struct StoredPlain {
     pub path: PathBuf,
     /// Whether the source archive was already stored with valid hash.
     pub was_cached: bool,
+    /// How the source archive is shared with the build environment.
+    pub share_mode: ShareMode,
 }
 
 impl StoredPlain {
-    /// Shares the Git repository in preparation of a build.
-    ///
-    /// This function tries to be as efficient as possible in terms
-    /// of actual bytes copied: a hard link is created if possible.
-    pub fn share(&self, dest_dir: &Path) -> Result<(), Error> {
-        let target = dest_dir.join(self.name.clone());
-
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)?;
+    /// Prepares the builder container's file system to build this source archive.
+    /// It does so by extracting the archive or creating the parent directory for its bind-mount,
+    /// depending on [Self::share_mode].
+    /// `host_dir` is a directory in the host system that will eventually be shared with the container.
+    pub async fn prepare_fs(&self, host_dir: &Path) -> Result<(), Error> {
+        match &self.share_mode {
+            ShareMode::Extract { dir, strip_dirs } => {
+                let target = host_dir.join(dir.as_deref().unwrap_or(Path::new(&self.name)));
+                fs::create_dir_all(&target)?;
+                extract(&self.path, &target, *strip_dirs).await?;
+            }
+            ShareMode::Mount => {
+                let target = host_dir.join(Path::new(&self.name));
+                if let Some(parent) = target.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
         }
-        util::hardlink_or_copy(&self.path, &target)?;
 
         Ok(())
+    }
+
+    /// Configures the builder container to bind-mount the source archive, in read-only mode.
+    /// It does nothing when [Self::share_mode] is [ShareMode::Extract].
+    /// The destination must already be prepared.
+    /// `guest_dir` is the mount point of `host_dir` that was configured with [Self::prepare_fs].
+    pub fn config_mounts(&self, cont: &mut Container, guest_dir: &Path) {
+        if let ShareMode::Mount = &self.share_mode {
+            cont.bind_ro(self.path.clone(), guest_dir.join(&self.name));
+        }
+    }
+}
+
+/// Determines how the archive is shared with the build environment.
+#[derive(Clone, Debug)]
+pub enum ShareMode {
+    /// Extracts the source archive.
+    Extract {
+        /// Directory where the source archive is extracted, relative to
+        /// a destination directory. If None, the directory name is [StoredPlain::name].
+        dir: Option<PathBuf>,
+        /// Number of leading directories to strip from the source archive.
+        strip_dirs: u8,
+    },
+
+    /// Shares the source archive as-is, without extracting it.
+    Mount,
+}
+
+impl ShareMode {
+    pub const DEFAULT_STRIP_DIRS: u8 = 1;
+}
+
+impl Default for ShareMode {
+    fn default() -> Self {
+        Self::Extract {
+            dir: None,
+            strip_dirs: Self::DEFAULT_STRIP_DIRS,
+        }
     }
 }
 
