@@ -177,8 +177,10 @@ impl Phase {
             env.add_builtin_string("compiler_d", "ldc2");
             env.add_builtin_string("compiler_ar", "llvm-ar");
             env.add_builtin_string("compiler_objcopy", "llvm-objcopy");
+            env.add_builtin_string("compiler_objdump", "llvm-objdump");
             env.add_builtin_string("compiler_nm", "llvm-nm");
             env.add_builtin_string("compiler_ranlib", "llvm-ranlib");
+            env.add_builtin_string("compiler_readelf", "llvm-readelf");
             env.add_builtin_string("compiler_strip", "llvm-strip");
         } else {
             env.add_builtin_string("compiler_c", "gcc");
@@ -191,8 +193,10 @@ impl Phase {
             env.add_builtin_string("compiler_d", "ldc2"); // FIXME: GDC
             env.add_builtin_string("compiler_ar", "gcc-ar");
             env.add_builtin_string("compiler_objcopy", "objcopy");
+            env.add_builtin_string("compiler_objdump", "objdump");
             env.add_builtin_string("compiler_nm", "gcc-nm");
             env.add_builtin_string("compiler_ranlib", "gcc-ranlib");
+            env.add_builtin_string("compiler_readelf", "readelf");
             env.add_builtin_string("compiler_strip", "strip");
         }
         env.add_builtin_string("compiler_path", path);

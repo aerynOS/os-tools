@@ -35,8 +35,10 @@ definitions:
     - compiler_d            : "%(_compiler_d)"
     - compiler_ar           : "%(_compiler_ar)"
     - compiler_objcopy      : "%(_compiler_objcopy)"
+    - compiler_objdump      : "%(_compiler_objdump)"
     - compiler_nm           : "%(_compiler_nm)"
     - compiler_ranlib       : "%(_compiler_ranlib)"
+    - compiler_readelf      : "%(_compiler_readelf)"
     - compiler_strip        : "%(_compiler_strip)"
     - compiler_path         : "%(_compiler_path)"
     - compiler_ld           : "%(_compiler_ld)"
@@ -96,8 +98,10 @@ definitions:
     - ar             : "%(compiler_ar)"
     - ld             : "%(compiler_ld)"
     - objcopy        : "%(compiler_objcopy)"
+    - objdump        : "%(compiler_objdump)"
     - nm             : "%(compiler_nm)"
     - ranlib         : "%(compiler_ranlib)"
+    - readelf        : "%(compiler_readelf)"
     - strip          : "%(compiler_strip)"
     - path           : "%(compiler_path)"
     - ccachedir      : "%(compiler_cache)"
@@ -144,8 +148,10 @@ actions              :
             AR="%(ar)"; export AR
             LD="%(ld)"; export LD
             OBJCOPY="%(objcopy)"; export OBJCOPY
+            OBJDUMP="%(objdump)"; export OBJDUMP
             NM="%(nm)"; export NM
             RANLIB="%(ranlib)"; export RANLIB
+            READELF="%(readelf)"; export READELF
             STRIP="%(strip)"; export STRIP
             PATH="%(path)"; export PATH
             GOAMD64="%(goamd64_arch)"; export GOAMD64
