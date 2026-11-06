@@ -201,3 +201,9 @@ The request is typed data, not a string, so non-terminal consumers can use it.
 
 Move `cli` to a `moss_cli` crate, and carve `cli::shell` out into a `moss_shell` crate reused
 by all moss callers, such as boulder.
+
+> This proposal doesn't include the moss_shell split (its currently moss::cli::shell)
+> because it requires we split moss lib / bin into separate crates (moss_cli)
+> before we can sandwich moss_shell between them.
+>
+> I (tarkah) didn't want to pollute this proposal w/ that work.
