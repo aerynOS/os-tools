@@ -1,10 +1,26 @@
 // SPDX-FileCopyrightText: 2024 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use container::Container;
-use thiserror::Error;
+use std::path::PathBuf;
 
 use crate::Paths;
+
+pub use container::{Container, Error};
+
+pub struct Mapping {
+    pub host: PathBuf,
+    pub guest: PathBuf,
+}
+
+impl Mapping {
+    /// Applies [std::path::Path::join] to both the host and guest paths of this mapping.
+    pub fn join(&self, path: impl AsRef<std::path::Path>) -> Mapping {
+        Mapping {
+            host: self.host.join(path.as_ref()),
+            guest: self.guest.join(path.as_ref()),
+        }
+    }
+}
 
 pub fn new(paths: &Paths, networking: bool) -> Container {
     let artefacts = paths.artefacts();
@@ -48,10 +64,4 @@ where
 {
     new(paths, networking).run::<E>(f)?;
     Ok(())
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(transparent)]
-    Container(#[from] container::Error),
 }

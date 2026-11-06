@@ -22,7 +22,10 @@ use std::{
     time::Duration,
 };
 
-use crate::recipe::Recipe;
+use crate::{
+    container::{Container, Mapping},
+    recipe::Recipe,
+};
 use fs_err as fs;
 use futures_util::{StreamExt, TryStreamExt, stream};
 use moss::runtime;
@@ -55,15 +58,30 @@ impl Upstream {
     /// in the `upstream` section of a Stone recipe.
     pub fn from_recipe_upstream(upstream: upstream::Upstream, original_index: usize) -> Result<Self, Error> {
         match upstream.props {
-            upstream::Props::Plain { hash, rename, .. } => Ok(Self::Plain(Plain {
+            upstream::Props::Plain {
+                hash,
+                rename,
+                strip_dirs,
+                unpack,
+                unpack_dir,
+            } => Ok(Self::Plain(Plain {
                 url: upstream.url,
                 hash: hash.parse().map_err(plain::Error::from)?,
                 rename,
+                share_mode: if unpack {
+                    plain::ShareMode::Extract {
+                        dir: unpack_dir,
+                        strip_dirs: strip_dirs.unwrap_or(plain::ShareMode::DEFAULT_STRIP_DIRS),
+                    }
+                } else {
+                    plain::ShareMode::Mount
+                },
             })),
-            upstream::Props::Git { git_ref, .. } => Ok(Self::Git(Git {
+            upstream::Props::Git { git_ref, clone_dir } => Ok(Self::Git(Git {
                 url: upstream.url,
                 commit: git_ref,
                 original_index,
+                share_dir: clone_dir,
             })),
         }
     }
@@ -164,15 +182,32 @@ impl Stored {
         }
     }
 
-    /// Shares the upstream in preparation of a build.
-    ///
-    /// This function tries to be as efficient as possible in terms
-    /// of actual bytes written/copied, by linking files from the storage directory.
-    pub async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
+    /// Prepares the builder container's file system to build this Upstream.
+    /// `host_dir` is a directory in the host system that will eventually be shared with the container.
+    pub async fn prepare_fs(&self, host_dir: &Path) -> Result<(), Error> {
         match self {
-            Stored::Plain(plain) => plain.share(dest_dir)?,
-            Stored::Git(git) => git.share(&dest_dir.join(&git.name)).await?,
+            Stored::Plain(plain) => plain.prepare_fs(host_dir).await?,
+            Stored::Git(git) => git.prepare_fs(host_dir).await?,
         }
+        Ok(())
+    }
+
+    /// Configures the builder container to bind-mount the resources required
+    /// to build this Upstream.
+    /// `guest_dir` is the mount point of `host_dir` that was configured with [Self::prepare_fs].
+    pub fn config_mounts(&self, cont: &mut Container, guest_dir: &Path) {
+        match self {
+            Stored::Plain(plain) => plain.config_mounts(cont, guest_dir),
+            Stored::Git(git) => git.config_mounts(cont, guest_dir),
+        }
+    }
+
+    /// Shares the upstream in preparation of a build.
+    /// It is a convenience method for calling [Self::prepare_fs] and [Self::config_mounts]
+    /// all at once.
+    pub async fn share(&self, cont: &mut Container, mapping: Mapping) -> Result<(), Error> {
+        self.prepare_fs(&mapping.host).await?;
+        self.config_mounts(cont, &mapping.guest);
         Ok(())
     }
 }
@@ -231,7 +266,16 @@ pub fn sync(
                         .tick_chars("--=≡■≡=--"),
                 );
 
-                stored.share(share_dir).await?;
+                let mut cont = Container::new("/");
+                stored
+                    .share(
+                        &mut cont,
+                        Mapping {
+                            host: share_dir.to_path_buf(),
+                            guest: PathBuf::new(),
+                        },
+                    )
+                    .await?;
 
                 let cached_tag = stored
                     .was_cached()
@@ -374,6 +418,7 @@ upstreams:
                 original_ref: "main".to_owned(),
                 resolved_hash: "1111222233334444555566667777888899990000".to_owned(),
                 original_index: 0,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo2.git".to_owned(),
@@ -383,6 +428,7 @@ upstreams:
                 original_ref: "main".to_owned(),
                 resolved_hash: "aaaa1111bbbb2222cccc3333dddd4444eeee5555".to_owned(),
                 original_index: 1,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo3.git".to_owned(),
@@ -392,6 +438,7 @@ upstreams:
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 resolved_hash: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 original_index: 2,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo4.git".to_owned(),
@@ -401,6 +448,7 @@ upstreams:
                 original_ref: "abc123d".to_owned(),
                 resolved_hash: "abc123d567890abcdef1234567890abcdef12345".to_owned(),
                 original_index: 3,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "file.tar.gz".to_owned(),
@@ -411,6 +459,7 @@ upstreams:
                 original_ref: String::new(),
                 resolved_hash: String::new(),
                 original_index: 0,
+                share_dir: None,
             }),
         ];
 
@@ -456,11 +505,13 @@ upstreams:
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 resolved_hash: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 original_index: 0,
+                share_dir: None,
             }),
             Stored::Plain(StoredPlain {
                 name: "file.tar.gz".to_owned(),
                 path: "/tmp/file.tar.gz".into(),
                 was_cached: false,
+                share_mode: Default::default(),
             }),
         ];
 
