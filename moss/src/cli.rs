@@ -225,6 +225,8 @@ impl Command {
     // Ideally we would sort this list at compile time,
     // but there's no such feature at the moment.
     const ALIASES: &[(&str, &[&str])] = &[
+        ("install", &["pkg", "add", "-h"]), // expectation management alias
+        ("it", &["pkg", "add", "-h"]),      // - ditto -
         ("pad", &["pkg", "add"]),
         ("pex", &["pkg", "extract"]),
         ("pfe", &["pkg", "fetch"]),
@@ -236,8 +238,10 @@ impl Command {
         ("prm", &["pkg", "remove"]),
         ("rad", &["repo", "add"]),
         ("rdi", &["repo", "disable"]),
+        ("remove", &["pkg", "remove", "-h"]), // expectation management alias
         ("ren", &["repo", "enable"]),
         ("rls", &["repo", "list"]),
+        ("rm", &["pkg", "remove", "-h"]), // expectation management alias
         ("rrm", &["repo", "remove"]),
         ("rup", &["repo", "update"]),
         ("sr", &["search"]),       // The least bad option (still not good)
