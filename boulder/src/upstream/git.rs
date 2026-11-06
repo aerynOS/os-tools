@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use container::Container;
 use fs_err as fs;
 use moss::util;
 use thiserror::Error;
@@ -45,6 +46,8 @@ pub struct Git {
     /// Hash of the commit to be considered as source.
     pub commit: String,
     pub original_index: usize,
+    /// Overrides the directory where the upstream will be shared.
+    pub share_dir: Option<PathBuf>,
 }
 
 impl Git {
@@ -85,6 +88,7 @@ impl Git {
             original_ref: self.commit.to_owned(),
             resolved_hash,
             original_index: self.original_index,
+            share_dir: self.share_dir.clone(),
         })
     }
 
@@ -119,6 +123,7 @@ impl Git {
                 original_ref: self.commit.to_owned(),
                 resolved_hash,
                 original_index: self.original_index,
+                share_dir: self.share_dir.clone(),
             },
             has_ref,
         ))
@@ -161,27 +166,33 @@ pub struct StoredGit {
     pub resolved_hash: String,
     pub original_index: usize,
     pub repo: gitwrap::Repository,
+    /// Overrides the directory where the upstream will be shared.
+    pub share_dir: Option<PathBuf>,
 }
 
 impl StoredGit {
-    /// Shares the Git repository in preparation of a build.
-    pub async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
-        if let Some(parent) = dest_dir.parent() {
-            fs::create_dir_all(parent)?;
-        }
+    /// Prepares the builder container's file system to build the sources in this Git repository.
+    /// It does so by creating a new Git worktree out of the "parent" repository.
+    /// `host_dir` is a directory in the host system that will eventually be shared with the container.
+    pub async fn prepare_fs(&self, host_dir: &Path) -> Result<(), Error> {
+        let target = self.target_dir(host_dir);
 
-        // Clone from our mirror to destdir
-        let cloned = self.repo.clone_to(dest_dir).await?;
-
-        // Cloning sets origin to the local mirror, but we want to use
-        // the original remote as submodule resolving may depend on this
-        let source_origin = self.repo.get_remote_url("origin").await?;
-        cloned.set_remote_url("origin", &source_origin).await?;
-
-        // Finally checkout the desired commit
-        cloned.checkout(&self.resolved_hash).await?;
+        self.repo.add_worktree(&target, &self.resolved_hash).await?;
+        redirect_worktree_parent(&target.join(".git"), Path::new(GIT_WORKTREE_PARENT))?;
+        fs::create_dir(target.join(GIT_WORKTREE_PARENT))?;
 
         Ok(())
+    }
+
+    /// Configures the builder container to bind-mount the parent Git repository,
+    /// in read-only mode. The destination must already be prepared.
+    /// `guest_dir` is the mount point of `host_dir` that was configured with [Self::prepare_fs].
+    pub fn config_mounts(&self, cont: &mut Container, guest_dir: &Path) {
+        cont.bind_ro(self.repo.path(), self.target_dir(guest_dir).join(GIT_WORKTREE_PARENT));
+    }
+
+    fn target_dir(&self, dest_dir: &Path) -> PathBuf {
+        dest_dir.join(self.share_dir.as_deref().unwrap_or(Path::new(&self.name)))
     }
 }
 
@@ -218,4 +229,24 @@ fn set_progress_bar_style(pb: &ProgressBar) -> impl Fn(gitwrap::FetchProgress) {
         pb.set_position(prog.percent as u64);
         pb.set_prefix(prog.speed);
     }
+}
+
+const GIT_WORKTREE_PARENT: &str = ".git-parent";
+
+fn redirect_worktree_parent(git_link: &Path, new_repo_path: &Path) -> Result<(), Error> {
+    let content = fs::read_to_string(git_link)?;
+
+    let Some(path) = content.strip_prefix("gitdir: ") else {
+        return Ok(());
+    };
+    let Some((_, worktree_name)) = path.split_once(".git/worktrees/") else {
+        return Ok(());
+    };
+
+    fs::write(
+        git_link,
+        format!("gitdir: {}/worktrees/{worktree_name}", new_repo_path.display()),
+    )?;
+
+    Ok(())
 }
