@@ -19,19 +19,15 @@
 use std::{
     io,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use crate::{
     container::{Container, Mapping},
     recipe::Recipe,
 };
-use fs_err as fs;
-use futures_util::{StreamExt, TryStreamExt, stream};
-use moss::runtime;
 use stone_recipe::upstream::{self, SourceUri};
 use thiserror::Error;
-use tui::{MultiProgress, ProgressBar, ProgressStyle, Styled};
+use tui::{ProgressBar, Styled};
 
 use crate::upstream::{
     git::{Git, StoredGit},
@@ -222,89 +218,6 @@ pub fn parse_recipe(recipe: &Recipe) -> Result<Vec<Upstream>, Error> {
         .enumerate()
         .map(|(index, upstream)| Upstream::from_recipe_upstream(upstream, index))
         .collect()
-}
-
-/// Helper that stores and shares a list of [Upstream]s.
-pub fn sync(
-    recipe: &Recipe,
-    upstreams: &[Upstream],
-    storage_dir: &Path,
-    share_dir: &Path,
-) -> Result<Vec<Stored>, Error> {
-    println!();
-    println!("Sharing {} upstream(s) with the build container:", upstreams.len());
-
-    let mp = MultiProgress::new();
-    let tp = mp.add(
-        ProgressBar::new(upstreams.len() as u64).with_style(
-            ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
-                .unwrap()
-                .progress_chars("■≡=- "),
-        ),
-    );
-    tp.tick();
-
-    let stored = runtime::block_on(
-        stream::iter(upstreams)
-            .map(|upstream| async {
-                let pb = mp.insert_before(
-                    &tp,
-                    ProgressBar::new(u64::MAX).with_message(format!(
-                        "{} {}",
-                        "Downloading".blue(),
-                        upstream.name().bold(),
-                    )),
-                );
-                pb.enable_steady_tick(Duration::from_millis(150));
-
-                let stored = upstream.store(storage_dir, &pb).await?;
-
-                pb.set_message(format!("{} {}", "Copying".yellow(), upstream.name().bold()));
-                pb.set_style(
-                    ProgressStyle::with_template(" {spinner} {wide_msg} ")
-                        .unwrap()
-                        .tick_chars("--=≡■≡=--"),
-                );
-
-                let mut cont = Container::new("/");
-                stored
-                    .share(
-                        &mut cont,
-                        Mapping {
-                            host: share_dir.to_path_buf(),
-                            guest: PathBuf::new(),
-                        },
-                    )
-                    .await?;
-
-                let cached_tag = stored
-                    .was_cached()
-                    .then_some(format!("{}", " (cached)".dim()))
-                    .unwrap_or_default();
-
-                pb.finish();
-                mp.remove(&pb);
-                mp.suspend(|| println!("{} {}{cached_tag}", "Shared".green(), upstream.name().bold()));
-                tp.inc(1);
-
-                Ok(stored) as Result<_, Error>
-            })
-            .buffer_unordered(moss::environment::MAX_NETWORK_CONCURRENCY)
-            .try_collect::<Vec<_>>(),
-    )?;
-
-    if let Some(updated_yaml) = update_git_upstream_refs(&recipe.source, &stored) {
-        fs::write(&recipe.path, updated_yaml)?;
-        println!(
-            "{} | Git references resolved to commit hashes and saved to stone.yaml. This ensures reproducible builds since tags and branches can move over time.",
-            "Warning".yellow()
-        );
-    }
-
-    mp.clear()?;
-    println!();
-
-    Ok(stored)
 }
 
 /// Helper that removes a list of [Upstream]s from the storage directory.
