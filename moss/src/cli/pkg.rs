@@ -17,7 +17,7 @@ mod list;
 use crate::cli::{Confirmation, Global};
 
 #[derive(Debug, Parser)]
-#[command(about = "Manage, list, or show packages")]
+#[command(about = "Add, extract, fetch, list, remove, or show information about packages")]
 pub struct Command {
     #[command(subcommand)]
     subcommand: Subcommand,
@@ -66,7 +66,7 @@ enum Subcommand {
         packages: Vec<Provider>,
     },
 
-    #[command(about = "Add package(s) to the implicit system-model [aliases: pad]")]
+    #[command(about = "Add software package(s) to the implicit system-model [aliases: pad]")]
     Add(AddArgs),
 
     #[command(about = "Show information about the package provider [aliases: pif]")]
@@ -89,7 +89,7 @@ enum Subcommand {
         output_dir: PathBuf,
     },
 
-    #[command(about = "Remove package(s) from the implicit system-model [aliases: prm]")]
+    #[command(about = "Remove software package(s) from the implicit system-model [aliases: prm]")]
     Remove(RemoveArgs),
 }
 
