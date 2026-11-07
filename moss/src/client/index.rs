@@ -3,49 +3,44 @@
 
 use std::{
     collections::{BTreeMap, btree_map},
-    io,
+    io::{self, Write},
     path::{Path, PathBuf, StripPrefixError},
-    time::Duration,
+    sync::Arc,
 };
 
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use fs_err as fs;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use sha2::{Digest, Sha256};
 use stone::{StoneHeaderV1FileType, StoneReadError, StoneWriteError, StoneWriter};
 use thiserror::Error;
-use tui::{MultiProgress, ProgressBar, ProgressStyle, Styled};
 
 use crate::{
     client,
+    event::{self, Sink, task},
     package::{self, Meta, MissingMetaFieldError},
 };
 
 /// Index a directory of stone files & produce a `stone.index` index file
 ///
 /// If `output_dir` is `None`, `stone.index` is output to `index_dir`
+///
+/// Progress is reported to `observer`
 #[tracing::instrument(skip_all)]
-pub fn index(index_dir: &Path, output_dir: Option<&Path>) -> Result<(), Error> {
+pub fn index(index_dir: &Path, output_dir: Option<&Path>, observer: Arc<dyn event::Observer>) -> Result<(), Error> {
     let output_dir = output_dir.unwrap_or(index_dir);
 
     let stone_files = enumerate_stone_files(index_dir)?;
 
-    println!("Indexing {} files\n", stone_files.len());
-
-    let multi_progress = MultiProgress::new();
-
-    let total_progress = multi_progress.add(
-        ProgressBar::new(stone_files.len() as u64).with_style(
-            ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
-                .unwrap()
-                .progress_chars("■≡=- "),
-        ),
-    );
-    total_progress.tick();
+    let index_packages = Sink::new(observer).start_task(task::IndexPackages {
+        count: stone_files.len() as u64,
+    });
+    index_packages.enter_phase(task::IndexPackagesPhase::Indexing);
+    let total_progress = index_packages.start_progress(Some(stone_files.len() as u64), task::Unit::Items);
 
     let ctx = GetMetaCtx {
         output_dir,
-        multi_progress: &multi_progress,
+        index_packages: &index_packages,
         total_progress: &total_progress,
     };
     let list = stone_files
@@ -79,24 +74,16 @@ pub fn index(index_dir: &Path, output_dir: Option<&Path>) -> Result<(), Error> {
         }
     }
 
-    write_index(output_dir, map, &total_progress)?;
+    index_packages.enter_phase(task::IndexPackagesPhase::Writing);
 
-    multi_progress.clear()?;
+    let path = write_index(output_dir, map)?;
 
-    println!("\nIndex file written to {:?}", output_dir.join("stone.index").display());
+    index_packages.complete_task(task::IndexedPackages { path });
 
     Ok(())
 }
 
-fn write_index(dir: &Path, map: BTreeMap<package::Name, Meta>, total_progress: &ProgressBar) -> Result<(), Error> {
-    total_progress.set_message("Writing index file");
-    total_progress.set_style(
-        ProgressStyle::with_template("\n {spinner} {wide_msg}")
-            .unwrap()
-            .tick_chars("--=≡■≡=--"),
-    );
-    total_progress.enable_steady_tick(Duration::from_millis(150));
-
+fn write_index(dir: &Path, map: BTreeMap<package::Name, Meta>) -> Result<PathBuf, Error> {
     let path = dir.join("stone.index");
     let mut file = fs::File::create(&path)?;
 
@@ -111,14 +98,19 @@ fn write_index(dir: &Path, map: BTreeMap<package::Name, Meta>, total_progress: &
         writer.finalize()
     };
 
-    write_stone_index().map_err(|source| Error::StoneWrite { source, path })
+    write_stone_index().map_err(|source| Error::StoneWrite {
+        source,
+        path: path.clone(),
+    })?;
+
+    Ok(path)
 }
 
 #[derive(Clone, Copy)]
 struct GetMetaCtx<'a> {
     output_dir: &'a Path,
-    multi_progress: &'a MultiProgress,
-    total_progress: &'a ProgressBar,
+    index_packages: &'a task::Handle<task::IndexPackages>,
+    total_progress: &'a task::Progress<task::IndexPackages>,
 }
 
 fn get_meta(path: &Path, ctx: GetMetaCtx<'_>) -> Result<Meta, Error> {
@@ -126,19 +118,13 @@ fn get_meta(path: &Path, ctx: GetMetaCtx<'_>) -> Result<Meta, Error> {
         .try_into()
         .map_err(|_| Error::NonUtf8Path { path: path.to_owned() })?;
 
-    let progress = ctx
-        .multi_progress
-        .insert_before(ctx.total_progress, ProgressBar::new_spinner());
-    progress.enable_steady_tick(Duration::from_millis(150));
+    let index_package = ctx.index_packages.start_subtask(task::IndexPackage {
+        path: relative_path.clone().into(),
+    });
 
-    let (size, hash) = stat_file(path, &relative_path, &progress)?;
+    let (size, hash) = stat_file(path, &index_package)?;
 
-    progress.set_message(format!("{} {}", "Indexing".yellow(), relative_path.as_str().bold()));
-    progress.set_style(
-        ProgressStyle::with_template(" {spinner} {wide_msg}")
-            .unwrap()
-            .tick_chars("--=≡■≡=--"),
-    );
+    index_package.enter_phase(task::IndexPackagePhase::Indexing);
 
     let read_payloads = || -> Result<Vec<_>, _> {
         let mut file = fs::File::open(path)?;
@@ -160,33 +146,48 @@ fn get_meta(path: &Path, ctx: GetMetaCtx<'_>) -> Result<Meta, Error> {
     meta.download_size = Some(size);
     meta.uri = Some(relative_path.as_str().to_owned());
 
-    progress.finish();
-    ctx.multi_progress.remove(&progress);
-    ctx.multi_progress
-        .suspend(|| println!("{} {}", "Indexed".green(), relative_path.as_str().bold()));
+    index_package.complete_task(());
     ctx.total_progress.inc(1);
 
     Ok(meta)
 }
 
-fn stat_file(path: &Path, relative_path: &Utf8Path, progress: &ProgressBar) -> Result<(u64, String), Error> {
+fn stat_file(path: &Path, index_package: &task::Handle<task::IndexPackage>) -> Result<(u64, String), Error> {
     let file = fs::File::open(path)?;
     let size = file.metadata()?.len();
 
-    progress.set_length(size);
-    progress.set_message(format!("{} {}", "Hashing".blue(), relative_path.as_str().bold()));
-    progress.set_style(
-        ProgressStyle::with_template(" {spinner} |{percent:>3}%| {wide_msg} {binary_bytes_per_sec:>.dim} ")
-            .unwrap()
-            .tick_chars("--=≡■≡=--"),
-    );
+    index_package.enter_phase(task::IndexPackagePhase::Hashing);
+    let progress = index_package.start_progress(Some(size), task::Unit::Bytes);
 
     let mut hasher = Sha256::new();
-    io::copy(&mut &file, &mut progress.wrap_write(&mut hasher))?;
+    io::copy(
+        &mut &file,
+        &mut ProgressWriter {
+            writer: &mut hasher,
+            progress: &progress,
+        },
+    )?;
 
     let hash = hex::encode(hasher.finalize());
 
     Ok((size, hash))
+}
+
+struct ProgressWriter<'a, W> {
+    writer: W,
+    progress: &'a task::Progress<task::IndexPackage>,
+}
+
+impl<W: Write> Write for ProgressWriter<'_, W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let written = self.writer.write(buf)?;
+        self.progress.inc(written as u64);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
 }
 
 fn enumerate_stone_files(dir: &Path) -> Result<Vec<PathBuf>, Error> {
