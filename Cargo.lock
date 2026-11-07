@@ -286,6 +286,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
+ "cli_expected",
  "config",
  "container",
  "derive_more",
@@ -555,6 +556,14 @@ checksum = "7e30ffc187e2e3aeafcd1c6e2aa416e29739454c0ccaa419226d5ecd181f2d78"
 dependencies = [
  "clap",
  "roff",
+]
+
+[[package]]
+name = "cli_expected"
+version = "0.26.10"
+dependencies = [
+ "fs-err",
+ "similar",
 ]
 
 [[package]]
@@ -2000,6 +2009,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
+ "cli_expected",
  "config",
  "container",
  "dag",

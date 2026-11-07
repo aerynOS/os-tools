@@ -1,0 +1,19 @@
+$ boulder cache size --help
+--- exit status: 0
+--- stdout
+Show the cache size(s) for the current environment
+
+Usage: boulder cache size [OPTIONS]
+
+Options:
+  -b, --boulder-cache            Clean the boulder cache
+  -v, --verbose                  Print additional information about what boulder is doing
+  -m, --moss-cache               Clean the moss cache
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

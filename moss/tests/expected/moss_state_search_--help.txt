@@ -1,0 +1,27 @@
+$ moss state search --help
+--- exit status: 0
+--- stdout
+Search one or more states [aliases: sts]
+
+Usage: moss state search [OPTIONS] [ID]
+
+Arguments:
+  [ID]  State ID to show. If "active" is passed, show the currently active state
+
+Options:
+  -a, --added    Filter output to packages added to the system-model
+  -r, --removed  Filter output to packages removed from the system-model
+  -s, --synced   Filter output to synced packages
+  -h, --help     Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

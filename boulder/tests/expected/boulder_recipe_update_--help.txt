@@ -1,0 +1,39 @@
+$ boulder recipe update --help
+--- exit status: 0
+--- stdout
+Update a recipe file
+
+If no version or upstreams are provided, boulder will attempt to autoupdate the
+recipe, using the release information supplied in the monitoring.yaml file.
+
+If a version is passed but no upstream is passed, boulder will attempt to guess
+the new url from the existing url.
+
+If an upstream is passed but no version is passed, boulder will parse the new
+version from the new upstream.
+
+Usage: boulder recipe update [OPTIONS] [RECIPE]
+
+Arguments:
+  [RECIPE]  Recipe input path. [default: ./stone.yaml]
+
+Options:
+  -v, --verbose                  Print additional information about what boulder is doing
+      --ver <recipe_version>     Update version
+  -u, --upstream <UPSTREAMS>     Update upstream source, can be passed multiple times.
+                                 Applied in same order as defined in recipe file.
+                                 To update a Git upstream,
+                                 Use the "git|commit_or_tag" syntax.
+                                 
+                                 Example:
+                                  -u "https://some.plan/file.tar.gz" -u "git|v1.1"
+  -V, --version                  
+  -o, --output <OUTPUT>          Recipe output path. If omitted, overwrites the input recipe.
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --no-bump                  Don't increment the release number
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

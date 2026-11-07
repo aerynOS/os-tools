@@ -1,0 +1,20 @@
+$ boulder chroot --help
+--- exit status: 0
+--- stdout
+Chroot into the build environment
+
+Usage: boulder chroot [OPTIONS] [RECIPE]
+
+Arguments:
+  [RECIPE]  Path to recipe file [default: ./stone.yaml]
+
+Options:
+  -v, --verbose                  Print additional information about what boulder is doing
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

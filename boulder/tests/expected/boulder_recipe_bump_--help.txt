@@ -1,0 +1,19 @@
+$ boulder recipe bump --help
+--- exit status: 0
+--- stdout
+Bump a recipe's release
+
+Usage: boulder recipe bump [OPTIONS]
+
+Options:
+  -r, --recipe <RECIPE>          The recipe file to update [default: ./stone.yaml]
+  -v, --verbose                  Print additional information about what boulder is doing
+  -n, --release <RELEASE>        Set release to a specific number instead of incrementing by one
+  -V, --version                  
+  -y, --yes                      Answer yes to confirmation prompts
+      --cache-dir <CACHE_DIR>    
+      --config-dir <CONFIG_DIR>  
+      --data-dir <DATA_DIR>      
+      --moss-root <MOSS_ROOT>    
+  -h, --help                     Print help
+--- stderr

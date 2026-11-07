@@ -1,0 +1,44 @@
+$ moss state export --help
+--- exit status: 0
+--- stdout
+Export a state as a system-model.kdl file [aliases: ste]
+
+Usage: moss state export [OPTIONS] [ID]
+
+Arguments:
+  [ID]
+          State id to export or current state if omitted
+
+Options:
+  -o, --output [<OUTPUT>]
+          Export to the provided path or stdout if not supplied.
+          
+          If supplied without a path or path is a directory, outputs to "system-model-{hostname}-fstxn-{id}.kdl".
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -v, --verbose
+          Prints additional information about what moss is doing
+
+  -D, --directory <ROOT_DIR>
+          Root directory
+          
+          [default: /]
+
+      --cache-dir <CACHE_DIR>
+          Cache directory
+
+      --log <LOG>
+          Logging configuration: <level>[:<format>][:<destination>]
+          Levels: trace, debug, info, warn, error
+          Formats: text, json
+          Destinations: stderr, <file>
+
+  -y, --yes
+          Assume yes for all questions
+
+  -V, --version
+          Print version and exit
+--- stderr

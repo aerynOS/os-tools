@@ -1,0 +1,51 @@
+$ moss sync --help
+--- exit status: 0
+--- stdout
+Sync package selections with candidates from the highest priority repository
+
+Usage: moss sync [OPTIONS]
+
+Options:
+  -u, --update
+          Update repositories before syncing
+
+      --to <dir>
+          Blit this sync to the provided directory instead of the root
+          
+          This operation won't be captured as a new state
+
+      --dry-run
+          Simulate the sync (dry-run)
+
+      --import <file>
+          Sync against the provided system-model.kdl
+          
+          Only the repositories and packages from the provided file will be used to create the new state
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -v, --verbose
+          Prints additional information about what moss is doing
+
+  -D, --directory <ROOT_DIR>
+          Root directory
+          
+          [default: /]
+
+      --cache-dir <CACHE_DIR>
+          Cache directory
+
+      --log <LOG>
+          Logging configuration: <level>[:<format>][:<destination>]
+          Levels: trace, debug, info, warn, error
+          Formats: text, json
+          Destinations: stderr, <file>
+
+  -y, --yes
+          Assume yes for all questions
+
+  -V, --version
+          Print version and exit
+--- stderr

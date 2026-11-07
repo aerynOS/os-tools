@@ -1,0 +1,10 @@
+$ moss pkg add
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <PROVIDERS>...
+
+Usage: moss pkg add <PROVIDERS>...
+
+For more information, try '--help'.

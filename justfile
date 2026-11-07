@@ -83,6 +83,19 @@ test: lint
   @echo "Running tests in all packages…"
   cargo test --all
 
+# Update the expected output of a command checked by the tests.
+# Without a command, the expected output of all checked commands is updated.
+update-cli-test-expected command="":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ -z "{{ command }}" ]; then
+    UPDATE_EXPECTED='*' cargo test -p moss -p boulder --test cli_output
+  else
+    package="$(echo {{ command }} | cut -d' ' -f1)"
+    UPDATE_EXPECTED="{{ command }}" cargo test -p "$package" --test cli_output
+  fi
+  git status --short --untracked-files=all -- moss/tests/expected boulder/tests/expected
+
 # Set the Minimum Supported Rust Version for the project
 set-msrv version:
   sed -E -i 's|^channel *= *"[0-9.]*"$|channel = "{{version}}"|' rust-toolchain.toml
