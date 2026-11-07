@@ -143,8 +143,7 @@ pub enum Props {
     Git {
         #[serde(rename = "ref")]
         git_ref: String,
-        #[serde(rename = "clonedir")]
-        clone_dir: Option<PathBuf>,
+        dest: Option<GitDestination>,
     },
 }
 
@@ -160,10 +159,54 @@ impl Props {
     }
 
     fn default_git(git_ref: String) -> Self {
-        Self::Git {
-            git_ref,
-            clone_dir: None,
+        Self::Git { git_ref, dest: None }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+/// Determines where a Git upstream is cloned.
+pub enum GitDestination {
+    /// The Git upstream is cloned into the specified directory.
+    Dir(PathBuf),
+
+    /// The Git upstream is cloned to satisfy the specified submodule.
+    /// The path of clone depends on how the submodule is configured.
+    Submodule {
+        /// Path of the repo containing the submodule.
+        /// If relative, it is relative to the work directory.
+        ///
+        /// This option is particularly useful to solve recursive submodules.
+        parent: PathBuf,
+        /// Path of the submodule within the parent repository.
+        path: PathBuf,
+    },
+}
+
+impl<'de> Deserialize<'de> for GitDestination {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct SubmoduleRepr {
+            parent: PathBuf,
+            path: PathBuf,
         }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Dir { clonedir: PathBuf },
+            Submodule { submodule: SubmoduleRepr },
+        }
+
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::Dir { clonedir } => Self::Dir(clonedir),
+            Repr::Submodule { submodule } => Self::Submodule {
+                parent: submodule.parent,
+                path: submodule.path,
+            },
+        })
     }
 }
 
@@ -174,7 +217,7 @@ mod tests {
     static SRC_URL: &str = "https://example.com/source";
 
     #[test]
-    fn parse_archive() -> Result<(), url::ParseError> {
+    fn parse_archive_uri() -> Result<(), url::ParseError> {
         let src: SourceUri = SRC_URL.parse()?;
         assert_eq!(
             src,
@@ -187,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_git() -> Result<(), url::ParseError> {
+    fn parse_git_uri() -> Result<(), url::ParseError> {
         let src: SourceUri = format!("{GIT_PREFIX}{SRC_URL}").parse()?;
         assert_eq!(
             src,
@@ -197,5 +240,29 @@ mod tests {
             }
         );
         Ok(())
+    }
+
+    #[test]
+    fn parse_git_destination_yaml() -> Result<(), serde_yaml::Error> {
+        assert_eq!(
+            serde_yaml::from_str::<GitDestination>("clonedir: /tmp/example")?,
+            GitDestination::Dir(PathBuf::from("/tmp/example"))
+        );
+        assert_eq!(
+            serde_yaml::from_str::<GitDestination>(concat!("submodule:\n", "  parent: .\n", "  path: example"))?,
+            GitDestination::Submodule {
+                parent: PathBuf::from("."),
+                path: "example".into()
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_git_destination_yaml_fails() {
+        // Missing "submodule" parent object.
+        assert!(serde_yaml::from_str::<GitDestination>(concat!("parent: .\n", "path: example")).is_err());
+        // Missing "parent" key.
+        assert!(serde_yaml::from_str::<GitDestination>(concat!("submodule:\n", "  path: example")).is_err());
     }
 }
