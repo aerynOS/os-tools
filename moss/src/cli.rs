@@ -9,6 +9,7 @@ use std::{
 };
 
 use clap::{Args, CommandFactory, Parser};
+use clap_complete::CompleteEnv;
 use moss::{Installation, client, installation};
 use stone::StoneReadError;
 use thiserror::Error;
@@ -28,6 +29,7 @@ mod sync;
 mod tree;
 
 pub fn run() -> Result<(), BoxedError> {
+    CompleteEnv::with_factory(Command::command).complete();
     Command::parse_expanded().run()
 }
 
@@ -326,6 +328,7 @@ enum Subcommand {
     SearchFile(search_file::Command),
     State(state::Command),
     Sync(sync::Command),
+    #[command(hide = true)]
     Tree(tree::Command),
 
     /// This is not a real subcommand, but a hook
