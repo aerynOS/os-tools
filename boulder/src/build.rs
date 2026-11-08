@@ -220,6 +220,8 @@ impl Builder {
                 if matches!(e, Error::BreakpointExit) {
                     // Restore ourselves as fg term since bash steals it
                     ::container::set_term_fg(pgid)?;
+                } else {
+                    suggest_build_fixes(target);
                 }
                 return err;
             }
@@ -530,6 +532,25 @@ async fn store_upstream(ups: &Upstream, storage_dir: &Path, pb: &ProgressBar) ->
         .unwrap_or_default();
     pb.suspend(|| println!("{} {}{cached_tag}", "Downloaded".green(), ups.name().bold()));
     Ok(stored)
+}
+
+fn suggest_build_fixes(target: &Target) {
+    let Some(work_dir) = target.jobs.first().map(|j| &j.work_dir) else {
+        return;
+    };
+
+    if work_dir.join(".gitmodules").exists() {
+        eprintln!(
+            concat!(
+                "{}: Build failed, but this recipe lists Git submodules. ",
+                "Please check if submodules are required.\n",
+                "Declared submodules:\n",
+                "{}"
+            ),
+            "Hint".blue(),
+            gitwrap::print_submodules(work_dir).unwrap_or_default()
+        );
+    }
 }
 
 #[derive(Debug, Error)]
