@@ -213,6 +213,21 @@ impl Repository {
     }
 }
 
+/// Returns a list of submodules and the expected hashes, if any.
+/// Submodule traversal is performed recursively.
+/// The list is supposed to be human-readable, thus it is a String.
+pub fn print_submodules(path: &Path) -> Result<String, Error> {
+    let output = run_git_sync([
+        OsStr::new("-C"),
+        path.as_os_str(),
+        OsStr::new("submodule"),
+        OsStr::new("status"),
+        OsStr::new("--recursive"),
+        OsStr::new("--cached"), // Print the expected hash, not the current one.
+    ])?;
+    Ok(str::from_utf8(output.stdout.trim_ascii_end()).unwrap_or("").to_owned())
+}
+
 /// The argument of callbacks when they are invoked
 /// for reporting a Git operation's progress.
 pub struct FetchProgress {
@@ -265,6 +280,27 @@ where
         Err(InnerError::Run {
             code: result.code(),
             stderr: None,
+        })?
+    }
+}
+
+/// Runs git and waits for it to terminate.
+fn run_git_sync<I, S>(args: I) -> Result<std::process::Output, Error>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = std::process::Command::new("git")
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(InnerError::from)?;
+    if output.status.success() {
+        Ok(output)
+    } else {
+        Err(InnerError::Run {
+            code: output.status.code(),
+            stderr: Some(String::from_utf8(output.stderr).unwrap()),
         })?
     }
 }
