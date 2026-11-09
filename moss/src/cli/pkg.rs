@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use std::{io, path::PathBuf};
+use std::{io, path::PathBuf, sync::Arc};
 
 use clap::Parser;
 use info::info;
 use list::list;
-use moss::{Client, Installation, client, dependency::Provider, environment};
+use moss::{Client, Installation, client, dependency::Provider, environment, event};
 use stone::StoneReadError;
 use thiserror::Error;
 use tracing::instrument;
@@ -25,13 +25,18 @@ pub struct Command {
 
 impl Command {
     /// Handles the "package" subcommand.
-    pub fn handle(self, global: Global, installation: Installation) -> Result<(), Error> {
+    pub fn handle(
+        self,
+        global: Global,
+        installation: Installation,
+        observer: Arc<dyn event::Observer>,
+    ) -> Result<(), Error> {
         match self.subcommand {
-            Subcommand::Fetch { output_dir, packages } => fetch(global, output_dir, packages, installation),
+            Subcommand::Fetch { output_dir, packages } => fetch(global, output_dir, packages, installation, observer),
             Subcommand::Add(args) => add(global, args, installation),
             Subcommand::Info(args) => info(args, installation),
             Subcommand::List(args) => list(args, installation),
-            Subcommand::Extract { files, output_dir } => extract(files, output_dir),
+            Subcommand::Extract { files, output_dir } => extract(files, output_dir, observer),
             Subcommand::Remove(args) => remove(global, args, installation),
         }
     }
@@ -170,10 +175,13 @@ fn fetch(
     output_dir: PathBuf,
     providers: Vec<Provider>,
     installation: Installation,
+    observer: Arc<dyn event::Observer>,
 ) -> Result<(), Error> {
     let pkgs = providers.iter().map(|prov| prov.to_string()).collect::<Vec<_>>();
 
-    let mut client = Client::new(environment::NAME, installation)?;
+    let mut client = Client::builder(environment::NAME, installation)
+        .observer(observer)
+        .build()?;
 
     // FIXME: Maybe we want client.fetch to accept Providers?
     // It's already using them internally.
@@ -220,8 +228,8 @@ fn remove(global: Global, args: RemoveArgs, installation: Installation) -> Resul
 }
 
 /// Handle execution of `moss pkg extract`
-fn extract(files: Vec<PathBuf>, output_dir: PathBuf) -> Result<(), Error> {
+fn extract(files: Vec<PathBuf>, output_dir: PathBuf, observer: Arc<dyn event::Observer>) -> Result<(), Error> {
     let paths_ref = files.iter().collect();
-    client::extract(paths_ref, &output_dir)?;
+    client::extract(paths_ref, &output_dir, observer)?;
     Ok(())
 }
