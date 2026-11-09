@@ -1,0 +1,10 @@
+$ moss pkg list
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <--available|--explicit|--installed|--repositories <REPOSITORIES>|--sync>
+
+Usage: moss pkg list <--available|--explicit|--installed|--repositories <REPOSITORIES>|--sync>
+
+For more information, try '--help'.

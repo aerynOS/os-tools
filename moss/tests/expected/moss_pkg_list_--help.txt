@@ -1,0 +1,26 @@
+$ moss pkg list --help
+--- exit status: 0
+--- stdout
+List packages according to the supplied filter argument (requires an argument)
+
+Usage: moss pkg list [OPTIONS] <--available|--explicit|--installed|--repositories <REPOSITORIES>|--sync>
+
+Options:
+  -a, --available                    List available packages given the active system-model repositories [aliases: pla]
+  -e, --explicit                     List explicitly added packages in the system-model [aliases: ple]
+  -i, --installed                    List the resolved set of packages installed from the system-model [aliases: pli]
+  -r, --repositories <REPOSITORIES>  Limit the list of packages to the specified, known repositories
+  -s, --sync                         List the packages that would be sync'd based on the cached repository state [aliases: pls]
+  -h, --help                         Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

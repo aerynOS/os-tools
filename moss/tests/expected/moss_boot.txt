@@ -1,0 +1,25 @@
+$ moss boot
+--- exit status: 2
+--- stdout
+--- stderr
+Manage boot configuration via blsforme
+
+Usage: moss boot [OPTIONS] <COMMAND>
+
+Commands:
+  status  Show boot configuration status
+  sync    Synchronize boot configuration
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit

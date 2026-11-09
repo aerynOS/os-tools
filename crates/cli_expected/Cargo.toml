@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 AerynOS Developers
+# SPDX-License-Identifier: MPL-2.0
+
+[package]
+name = "cli_expected"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fs-err.workspace = true
+similar.workspace = true
+
+[lints]
+workspace = true

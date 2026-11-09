@@ -1,0 +1,10 @@
+$ moss state remove
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <STATES|--keep <KEEP>|--prune>
+
+Usage: moss state remove <STATES|--keep <KEEP>|--prune>
+
+For more information, try '--help'.

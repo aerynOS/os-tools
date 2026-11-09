@@ -1,0 +1,10 @@
+$ moss inspect
+--- exit status: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <PATHS>...
+
+Usage: moss inspect <PATHS>...
+
+For more information, try '--help'.

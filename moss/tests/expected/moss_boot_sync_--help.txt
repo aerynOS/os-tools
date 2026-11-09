@@ -1,0 +1,21 @@
+$ moss boot sync --help
+--- exit status: 0
+--- stdout
+Synchronize boot configuration
+
+Usage: moss boot sync [OPTIONS]
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

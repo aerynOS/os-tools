@@ -1,0 +1,34 @@
+$ moss repo add --help
+--- exit status: 0
+--- stdout
+Add a new repository [aliases: rad]
+
+Usage: moss repo add [OPTIONS] --comment <COMMENT> <NAME> <URL>
+
+Arguments:
+  <NAME>  
+  <URL>   
+
+Options:
+  -c, --comment <COMMENT>    
+  -p, --priority <PRIORITY>  Repository priority [default: 0]
+  -h, --help                 Print help
+
+Root index:
+      --root-index <root-index-options>
+          Defines the repo via root index options where <URI> is the base-uri and all other options are passed to this flag
+          
+          Example: --root-index version=stream/unstable
+          Example: --root-index channel=testing,version=tag/some-bug
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
+--- stderr

@@ -1,0 +1,29 @@
+$ moss repo
+--- exit status: 2
+--- stdout
+--- stderr
+Manage the available software repositories visible to the installed system
+
+Usage: moss repo [OPTIONS] <COMMAND>
+
+Commands:
+  add      Add a new repository [aliases: rad]
+  list     List system software repositories [aliases: rls]
+  remove   Remove a repository for the system [aliases: rrm]
+  update   Update the system repositories [aliases: rup]
+  enable   Enable a system repository [aliases: ren]
+  disable  Disable a system repository [aliases: rdi]
+
+Options:
+  -h, --help  Print help
+
+Global Options:
+  -v, --verbose                Prints additional information about what moss is doing
+  -D, --directory <ROOT_DIR>   Root directory [default: /]
+      --cache-dir <CACHE_DIR>  Cache directory
+      --log <LOG>              Logging configuration: <level>[:<format>][:<destination>]
+                               Levels: trace, debug, info, warn, error
+                               Formats: text, json
+                               Destinations: stderr, <file>
+  -y, --yes                    Assume yes for all questions
+  -V, --version                Print version and exit
