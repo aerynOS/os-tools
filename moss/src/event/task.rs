@@ -102,18 +102,18 @@ pub enum Unit {
 /// Dropping a handle without completing it reports [`Update::Aborted`], so a task
 /// left early by `?` is still finished for observers.
 #[must_use]
-pub struct Handle<T: Task> {
+pub struct Handle<'s, T: Task> {
     id: Id,
-    sink: Sink,
+    sink: &'s Sink,
     finished: bool,
     _task: PhantomData<fn() -> T>,
 }
 
-impl<T: Task> Handle<T> {
-    pub(super) fn new(sink: Sink, parent: Option<Id>, task: T) -> Self {
+impl<'s, T: Task> Handle<'s, T> {
+    pub(super) fn new(sink: &'s Sink, parent: Option<Id>, task: T) -> Self {
         let id = Id::next();
 
-        emit(&sink, Update::Started { id, parent, task });
+        emit(sink, Update::Started { id, parent, task });
 
         Self {
             id,
@@ -124,18 +124,18 @@ impl<T: Task> Handle<T> {
     }
 
     /// Start a task nested under this one
-    pub fn start_subtask<S: Task>(&self, task: S) -> Handle<S> {
-        Handle::new(self.sink.clone(), Some(self.id), task)
+    pub fn start_subtask<S: Task>(&'s self, task: S) -> Handle<'s, S> {
+        Handle::new(self.sink, Some(self.id), task)
     }
 
     /// Start reporting progress towards `total`, beginning at zero
     ///
     /// Call again with a new total when the task starts counting something else,
     /// such as after moving to a new phase.
-    pub fn start_progress(&self, total: Option<u64>, unit: Unit) -> Progress<T> {
+    pub fn start_progress(&'s self, total: Option<u64>, unit: Unit) -> Progress<'s, T> {
         let progress = Progress {
             id: self.id,
-            sink: self.sink.clone(),
+            sink: self.sink,
             current: Arc::new(AtomicU64::new(0)),
             total,
             unit,
@@ -148,14 +148,14 @@ impl<T: Task> Handle<T> {
     /// Report that the task finished successfully
     pub fn complete_task(mut self, outcome: T::Outcome) {
         self.finished = true;
-        emit(&self.sink, Update::<T>::Completed { id: self.id, outcome });
+        emit(self.sink, Update::<T>::Completed { id: self.id, outcome });
     }
 }
 
-impl<T: Task> Drop for Handle<T> {
+impl<T: Task> Drop for Handle<'_, T> {
     fn drop(&mut self) {
         if !self.finished {
-            emit(&self.sink, Update::<T>::Aborted { id: self.id });
+            emit(self.sink, Update::<T>::Aborted { id: self.id });
         }
     }
 }
@@ -164,16 +164,16 @@ impl<T: Task> Drop for Handle<T> {
 ///
 /// Cheap to clone and safe to share between threads, so parallel work can report
 /// progress without passing around the task's [`Handle`].
-pub struct Progress<T: Task> {
+pub struct Progress<'s, T: Task> {
     id: Id,
-    sink: Sink,
+    sink: &'s Sink,
     current: Arc<AtomicU64>,
     total: Option<u64>,
     unit: Unit,
     _task: PhantomData<fn() -> T>,
 }
 
-impl<T: Task> Progress<T> {
+impl<T: Task> Progress<'_, T> {
     /// Set the current position
     pub fn set(&self, current: u64) {
         self.current.store(current, Ordering::Relaxed);
@@ -188,7 +188,7 @@ impl<T: Task> Progress<T> {
 
     fn emit(&self, current: u64) {
         emit(
-            &self.sink,
+            self.sink,
             Update::<T>::Progress {
                 id: self.id,
                 current,
@@ -199,11 +199,11 @@ impl<T: Task> Progress<T> {
     }
 }
 
-impl<T: Task> Clone for Progress<T> {
+impl<T: Task> Clone for Progress<'_, T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
-            sink: self.sink.clone(),
+            sink: self.sink,
             current: self.current.clone(),
             total: self.total,
             unit: self.unit,
