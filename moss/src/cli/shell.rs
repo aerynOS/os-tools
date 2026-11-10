@@ -3,8 +3,6 @@
 
 //! Renders [`moss::Event`]s for the shell
 
-use std::sync::Arc;
-
 use moss::event;
 
 pub use self::human::Human;
@@ -25,10 +23,10 @@ pub enum Format {
 
 impl Format {
     /// The observer that writes events in this format
-    pub fn observer(self) -> Arc<dyn event::Observer> {
+    pub fn observer(self) -> Box<dyn event::Observer> {
         match self {
-            Format::Human => Arc::new(Human::default()),
-            Format::Json => Arc::new(Json),
+            Format::Human => Box::new(Human::default()),
+            Format::Json => Box::new(Json),
         }
     }
 }

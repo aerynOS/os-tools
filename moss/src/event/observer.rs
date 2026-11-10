@@ -15,10 +15,3 @@ use super::Event;
 pub trait Observer: Send + Sync {
     fn event(&self, event: &Event);
 }
-
-/// An [`Observer`] that ignores all events
-pub struct Noop;
-
-impl Observer for Noop {
-    fn event(&self, _event: &Event) {}
-}

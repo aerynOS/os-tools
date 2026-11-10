@@ -13,7 +13,6 @@ use std::{
     io,
     os::unix::fs::symlink,
     path::{Path, PathBuf},
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -90,8 +89,8 @@ impl ClientBuilder {
     /// Set the observer to receive [`Event`](crate::Event)s about what the client is doing
     ///
     /// Without one, events are ignored and the client produces no output.
-    pub fn observer(mut self, observer: Arc<dyn event::Observer>) -> ClientBuilder {
-        self.events = event::Sink::new(observer);
+    pub fn observer(mut self, observer: Box<dyn event::Observer>) -> ClientBuilder {
+        self.events.add_observer(observer);
         self
     }
 
@@ -180,7 +179,7 @@ impl Client {
             repositories: None,
             system_model_path: None,
             blit_root: None,
-            events: event::Sink::default(),
+            events: event::Sink::new(),
         }
     }
 
@@ -942,7 +941,7 @@ impl Client {
             state_db,
             layout_db,
             scope: Scope::Stateful,
-            events: event::Sink::default(),
+            events: event::Sink::new(),
         })
     }
 }
