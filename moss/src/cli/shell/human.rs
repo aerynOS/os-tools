@@ -22,7 +22,7 @@ struct TaskProgress {
     label: String,
 }
 
-impl event::Observer for Human {
+impl event::Subscriber for Human {
     fn event(&self, event: &Event) {
         match event {
             Event::Task(task::Event::FetchPackages(update)) => self.fetch_packages(update),

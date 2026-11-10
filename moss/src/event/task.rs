@@ -15,7 +15,7 @@ use std::{
 
 use serde::Serialize;
 
-use super::Sink;
+use super::Publisher;
 
 pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
 
@@ -100,42 +100,42 @@ pub enum Unit {
 /// Reports on a running task
 ///
 /// Dropping a handle without completing it reports [`Update::Aborted`], so a task
-/// left early by `?` is still finished for observers.
+/// left early by `?` is still finished for subscribers.
 #[must_use]
-pub struct Handle<'s, T: Task> {
+pub struct Handle<'p, T: Task> {
     id: Id,
-    sink: &'s Sink,
+    publisher: &'p Publisher,
     finished: bool,
     _task: PhantomData<fn() -> T>,
 }
 
-impl<'s, T: Task> Handle<'s, T> {
-    pub(super) fn new(sink: &'s Sink, parent: Option<Id>, task: T) -> Self {
+impl<'p, T: Task> Handle<'p, T> {
+    pub(super) fn new(publisher: &'p Publisher, parent: Option<Id>, task: T) -> Self {
         let id = Id::next();
 
-        emit(sink, Update::Started { id, parent, task });
+        emit(publisher, Update::Started { id, parent, task });
 
         Self {
             id,
-            sink,
+            publisher,
             finished: false,
             _task: PhantomData,
         }
     }
 
     /// Start a task nested under this one
-    pub fn start_subtask<S: Task>(&'s self, task: S) -> Handle<'s, S> {
-        Handle::new(self.sink, Some(self.id), task)
+    pub fn start_subtask<S: Task>(&'p self, task: S) -> Handle<'p, S> {
+        Handle::new(self.publisher, Some(self.id), task)
     }
 
     /// Start reporting progress towards `total`, beginning at zero
     ///
     /// Call again with a new total when the task starts counting something else,
     /// such as after moving to a new phase.
-    pub fn start_progress(&'s self, total: Option<u64>, unit: Unit) -> Progress<'s, T> {
+    pub fn start_progress(&'p self, total: Option<u64>, unit: Unit) -> Progress<'p, T> {
         let progress = Progress {
             id: self.id,
-            sink: self.sink,
+            publisher: self.publisher,
             current: Arc::new(AtomicU64::new(0)),
             total,
             unit,
@@ -148,14 +148,14 @@ impl<'s, T: Task> Handle<'s, T> {
     /// Report that the task finished successfully
     pub fn complete_task(mut self, outcome: T::Outcome) {
         self.finished = true;
-        emit(self.sink, Update::<T>::Completed { id: self.id, outcome });
+        emit(self.publisher, Update::<T>::Completed { id: self.id, outcome });
     }
 }
 
 impl<T: Task> Drop for Handle<'_, T> {
     fn drop(&mut self) {
         if !self.finished {
-            emit(self.sink, Update::<T>::Aborted { id: self.id });
+            emit(self.publisher, Update::<T>::Aborted { id: self.id });
         }
     }
 }
@@ -164,9 +164,9 @@ impl<T: Task> Drop for Handle<'_, T> {
 ///
 /// Cheap to clone and safe to share between threads, so parallel work can report
 /// progress without passing around the task's [`Handle`].
-pub struct Progress<'s, T: Task> {
+pub struct Progress<'p, T: Task> {
     id: Id,
-    sink: &'s Sink,
+    publisher: &'p Publisher,
     current: Arc<AtomicU64>,
     total: Option<u64>,
     unit: Unit,
@@ -188,7 +188,7 @@ impl<T: Task> Progress<'_, T> {
 
     fn emit(&self, current: u64) {
         emit(
-            self.sink,
+            self.publisher,
             Update::<T>::Progress {
                 id: self.id,
                 current,
@@ -203,7 +203,7 @@ impl<T: Task> Clone for Progress<'_, T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
-            sink: self.sink,
+            publisher: self.publisher,
             current: self.current.clone(),
             total: self.total,
             unit: self.unit,
@@ -212,6 +212,6 @@ impl<T: Task> Clone for Progress<'_, T> {
     }
 }
 
-fn emit<T: Task>(sink: &Sink, update: Update<T>) {
-    sink.emit(super::Event::Task(T::into_event(update)));
+fn emit<T: Task>(publisher: &Publisher, update: Update<T>) {
+    publisher.publish(super::Event::Task(T::into_event(update)));
 }

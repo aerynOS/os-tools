@@ -22,8 +22,8 @@ pub enum Format {
 }
 
 impl Format {
-    /// The observer that writes events in this format
-    pub fn observer(self) -> Box<dyn event::Observer> {
+    /// The subscriber that receives events in this format
+    pub fn subscriber(self) -> Box<dyn event::Subscriber> {
         match self {
             Format::Human => Box::new(Human::default()),
             Format::Json => Box::new(Json),
