@@ -145,7 +145,7 @@ impl Builder {
 
         let timer = timing.begin(timing::Kind::Fetch);
 
-        let stored = runtime::block_on(
+        let mut stored = runtime::block_on(
             ui::run_parallel(
                 environment::MAX_NETWORK_CONCURRENCY,
                 self.upstreams.iter(),
@@ -153,6 +153,10 @@ impl Builder {
             )
             .try_collect::<Vec<_>>(),
         )?;
+        // Upstreams may have dependencies on the extraction path
+        // (especially with Git submodules). Ensure parent upstreams
+        // are shared first.
+        stored.sort_unstable_by(|s1, s2| s1.share_path().cmp(s2.share_path()));
 
         self.share_upstreams(cont, &stored)?;
 
