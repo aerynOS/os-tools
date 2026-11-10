@@ -20,7 +20,7 @@ pub use super::Error;
 
 mod types;
 
-const SCHEMAS: &[&str] = &[include_str!("schemas/v1_up.sql")];
+const SCHEMAS: &[&str] = &[include_str!("meta/schemas/v1_up.sql")];
 const MIGRATIONS: Migrations = Migrations::new(SCHEMAS);
 
 #[derive(Debug)]
