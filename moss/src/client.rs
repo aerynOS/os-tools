@@ -70,7 +70,7 @@ pub struct ClientBuilder {
     repositories: Option<repository::Map>,
     system_model_path: Option<PathBuf>,
     blit_root: Option<PathBuf>,
-    events: event::Sink,
+    events: event::Publisher,
 }
 
 impl ClientBuilder {
@@ -86,11 +86,11 @@ impl ClientBuilder {
         self
     }
 
-    /// Set the observer to receive [`Event`](crate::Event)s about what the client is doing
+    /// Add a subscriber to receive [`Event`](crate::Event)s about what the client is doing
     ///
     /// Without one, events are ignored and the client produces no output.
-    pub fn observer(mut self, observer: Box<dyn event::Observer>) -> ClientBuilder {
-        self.events.add_observer(observer);
+    pub fn subscriber(mut self, subscriber: Box<dyn event::Subscriber>) -> ClientBuilder {
+        self.events.subscribe(subscriber);
         self
     }
 
@@ -167,7 +167,7 @@ pub struct Client {
     /// Operational scope (real systems, ephemeral, etc)
     scope: Scope,
     /// Where to report what the client is doing
-    events: event::Sink,
+    events: event::Publisher,
 }
 
 impl Client {
@@ -179,7 +179,7 @@ impl Client {
             repositories: None,
             system_model_path: None,
             blit_root: None,
-            events: event::Sink::new(),
+            events: event::Publisher::new(),
         }
     }
 
@@ -941,7 +941,7 @@ impl Client {
             state_db,
             layout_db,
             scope: Scope::Stateful,
-            events: event::Sink::new(),
+            events: event::Publisher::new(),
         })
     }
 }

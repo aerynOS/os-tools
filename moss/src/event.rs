@@ -3,18 +3,18 @@
 
 //! Events moss reports instead of printing to the shell
 //!
-//! Events are sent to an [`Observer`] provided by the caller, which decides how to
+//! Events are sent to a [`Subscriber`] provided by the caller, which decides how to
 //! present them, such as progress bars, json or nothing at all. This also gives
 //! users a typed API instead of text to parse.
 
 use serde::Serialize;
 
-pub use self::observer::Observer;
-pub(crate) use self::sink::Sink;
+pub(crate) use self::publisher::Publisher;
+pub use self::subscriber::Subscriber;
 pub use self::task::Task;
 
-pub mod observer;
-mod sink;
+mod publisher;
+pub mod subscriber;
 pub mod task;
 
 /// Everything moss reports
