@@ -22,7 +22,7 @@ use types::{Layout, encode_file};
 
 mod types;
 
-const SCHEMAS: &[&str] = &[include_str!("schemas/v1_up.sql")];
+const SCHEMAS: &[&str] = &[include_str!("layout/schemas/v1_up.sql")];
 const MIGRATIONS: Migrations = Migrations::new(SCHEMAS);
 
 #[derive(Clone, Debug)]
