@@ -177,6 +177,17 @@ pub(crate) enum Stored {
 }
 
 impl Stored {
+    /// Path where the upstream will be shared inside a parent directory.
+    pub fn share_path(&self) -> &Path {
+        match self {
+            Stored::Plain(plain) => match &plain.share_mode {
+                plain::ShareMode::Extract { dir, .. } => dir.as_deref().unwrap_or(Path::new(&plain.name)),
+                plain::ShareMode::Mount => Path::new(&plain.name),
+            },
+            Stored::Git(git) => git.share_dir.as_deref().unwrap_or(Path::new(&git.name)),
+        }
+    }
+
     /// Name of the upstream, as returned by [Upstream::name].
     pub fn name(&self) -> &str {
         match self {
