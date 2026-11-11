@@ -65,6 +65,8 @@ pub struct Command {
     verify_against: Option<PathBuf>,
 }
 
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 pub fn handle(command: Command, env: Env) -> Result<(), Error> {
     let output = command.output.clone();
     let Command {
@@ -172,6 +174,8 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
     Ok(())
 }
 
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 fn verify_versions_match(builder: &Builder) -> Result<(), Error> {
     // Only check the first upstream, as that'll be the actual version
     // in the majority of cases.
