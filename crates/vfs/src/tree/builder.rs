@@ -96,7 +96,7 @@ impl<T: BlitFile> TreeBuilder<T> {
             }
         }
 
-        // Chain all directories, replace implicits with explicit
+        // Chain all directories, replace implicit directories with explicit ones
         let all_dirs = dirs
             .into_iter()
             .chain(self.implicit_dirs.into_values())
