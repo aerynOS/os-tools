@@ -65,6 +65,8 @@ pub enum Subcommand {
     Version(version::Command),
 }
 
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 pub fn process() -> Result<(), Error> {
     let args = replace_aliases(std::env::args());
     let Command { global, subcommand } = Command::parse_from(args.clone());

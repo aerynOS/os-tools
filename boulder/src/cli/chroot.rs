@@ -19,6 +19,8 @@ pub struct Command {
     recipe: PathBuf,
 }
 
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 pub fn handle(command: Command, env: Env) -> Result<(), Error> {
     let Command { recipe: recipe_path } = command;
 

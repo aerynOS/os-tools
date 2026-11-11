@@ -16,7 +16,7 @@ use crate::state::{Id, Kind, Selection, State};
 
 mod types;
 
-const SCHEMAS: &[&str] = &[include_str!("schemas/v1_up.sql")];
+const SCHEMAS: &[&str] = &[include_str!("state/schemas/v1_up.sql")];
 const MIGRATIONS: Migrations = Migrations::new(SCHEMAS);
 
 #[derive(Clone, Debug)]

@@ -2,5 +2,5 @@
 # SPDX-License-Identifier: MPL-2.0
 
 [toolchain]
-channel = "1.94"
+channel = "1.95"
 components = ["rust-analyzer", "rustfmt", "clippy"]

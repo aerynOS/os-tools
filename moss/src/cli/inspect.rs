@@ -29,6 +29,8 @@ pub struct Command {
 
 impl Command {
     /// Inspect the given .stone files and print results
+    // TODO: Box errors consistently throughout the codebase so that this can be removed
+    #[expect(clippy::result_large_err)]
     pub fn handle(self) -> Result<(), Error> {
         if self.check {
             handle_check(self.paths, self.quiet)
@@ -40,6 +42,8 @@ impl Command {
 
 const COLUMN_WIDTH: usize = 20;
 
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 fn handle_check(paths: Vec<PathBuf>, quiet: bool) -> Result<(), Error> {
     let mut had_error = false;
     for path in paths {
@@ -72,6 +76,8 @@ fn handle_check(paths: Vec<PathBuf>, quiet: bool) -> Result<(), Error> {
     }
 }
 
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 fn handle_detailed(paths: Vec<PathBuf>) -> Result<(), Error> {
     // Process each input path in order.
     for path in paths {
@@ -175,6 +181,8 @@ fn handle_detailed(paths: Vec<PathBuf>) -> Result<(), Error> {
 
 /// Checks the integrity of a single .stone file by reading all payloads
 /// and validating their checksums from any readable source.
+// TODO: Box errors consistently throughout the codebase so that this can be removed
+#[expect(clippy::result_large_err)]
 fn check_stone_integrity(mut source: impl Read + Seek) -> Result<Vec<String>, Error> {
     let mut reader = stone::read(&mut source)?;
     let mut found_payloads = Vec::new();
