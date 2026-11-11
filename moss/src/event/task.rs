@@ -213,5 +213,5 @@ impl<T: Task> Clone for Progress<'_, T> {
 }
 
 fn emit<T: Task>(publisher: &Publisher, update: Update<T>) {
-    publisher.publish(super::Event::Task(T::into_event(update)));
+    publisher.publish(T::into_event(update));
 }
