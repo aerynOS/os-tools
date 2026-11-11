@@ -137,6 +137,8 @@ wildcard_imports = "warn"
 
 # has false positives in indicatif usage
 literal_string_with_formatting_args = "allow"
+# determined to be mostly noise at the moment
+result_large_err = "allow"
 
 [profile.release]
 lto = "thin"
