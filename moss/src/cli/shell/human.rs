@@ -25,8 +25,8 @@ struct TaskProgress {
 impl event::Subscriber for Human {
     fn event(&self, event: &Event) {
         match event {
-            Event::Task(task::Event::FetchPackages(update)) => self.fetch_packages(update),
-            Event::Task(task::Event::FetchPackage(update)) => self.fetch_package(update),
+            Event::FetchPackages(update) => self.fetch_packages(update),
+            Event::FetchPackage(update) => self.fetch_package(update),
         }
     }
 }
