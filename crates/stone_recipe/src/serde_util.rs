@@ -2,9 +2,24 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use serde::Deserialize;
+use snafu::Snafu;
 
 pub fn default_true() -> bool {
     true
+}
+
+#[derive(Debug, Snafu)]
+pub enum BoolError {
+    #[snafu(display("invalid boolean: expected true or false"))]
+    Invalid,
+}
+
+pub fn parse_bool(value: &str) -> Result<bool, BoolError> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(BoolError::Invalid),
+    }
 }
 
 pub fn stringy_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
@@ -19,12 +34,7 @@ where
     }
 
     match Inner::deserialize(deserializer)? {
-        Inner::Bool(bool) => Ok(bool),
-        // allow only true and false per yaml 1.2
-        Inner::String(s) => match s.as_str() {
-            "true" => Ok(true),
-            "false" => Ok(false),
-            _ => Err(serde::de::Error::custom("invalid boolean: expected true or false")),
-        },
+        Inner::Bool(value) => Ok(value),
+        Inner::String(value) => parse_bool(&value).map_err(serde::de::Error::custom),
     }
 }
