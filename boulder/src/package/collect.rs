@@ -23,22 +23,27 @@ pub struct Rule {
 
 impl Rule {
     pub fn matches(&self, path: &str) -> bool {
-        if self.pattern == path {
-            return true;
-        }
-
-        // Escape the directory in case it contains characters that have special
-        // meaning in glob patterns (e.g., `[` or `]`).
-        let escaped_path = Pattern::escape(path);
-        Pattern::new(&self.pattern)
-                .map(|pattern| pattern.matches(&escaped_path))
-                .unwrap_or_default()
-            // If the supplied pattern is for a directory we want to match anything that's inside said directory,
-            // Do this by creating a recursive glob pattern by appending `**` if the pattern already ends in a `/` or `/**` if not
-            || Pattern::new(format!("{}/**", self.pattern.strip_suffix("/").unwrap_or(&self.pattern)).as_str())
-                .map(|pattern| pattern.matches(&escaped_path))
-                .unwrap_or_default()
+        path_matches(&self.pattern, path)
     }
+}
+
+/// Match a path against a glob or directory prefix pattern.
+pub fn path_matches(pattern: &str, path: &str) -> bool {
+    if pattern == path {
+        return true;
+    }
+
+    // Escape the path in case it contains characters that have special
+    // meaning in glob patterns (e.g. `[` or `]`).
+    let escaped_path = Pattern::escape(path);
+
+    Pattern::new(pattern)
+        .map(|pattern| pattern.matches(&escaped_path))
+        .unwrap_or_default()
+        // If the pattern is for a directory, match anything inside it
+        || Pattern::new(&format!("{}/**", pattern.strip_suffix('/').unwrap_or(pattern)))
+            .map(|pattern| pattern.matches(&escaped_path))
+            .unwrap_or_default()
 }
 
 #[derive(Debug)]
