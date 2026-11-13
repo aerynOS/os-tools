@@ -374,10 +374,22 @@ where
         let kind = phase.styled(format!("{}│", phase.abbrev()));
         let tag = format!("{}{pgo}{kind}", "│".dim());
 
-        let mut lines = io::BufReader::new(pipe).lines();
+        let mut reader = io::BufReader::new(pipe);
+        let mut line = Vec::new();
 
-        while let Some(Ok(line)) = lines.next() {
-            println!("{tag} {line}");
+        loop {
+            line.clear();
+
+            // Build output is not guaranteed to be UTF-8; a read error here must not
+            // drop the pipe and SIGPIPE the build.
+            match reader.read_until(b'\n', &mut line) {
+                Ok(0) => break,
+                Ok(_) => {
+                    let text = String::from_utf8_lossy(&line);
+                    println!("{tag} {}", text.trim_end_matches(['\r', '\n']));
+                }
+                Err(_) => break,
+            }
         }
     })
 }
