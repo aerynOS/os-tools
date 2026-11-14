@@ -383,9 +383,12 @@ where
             // Build output is not guaranteed to be UTF-8; a read error here must not
             // drop the pipe and SIGPIPE the build.
             match reader.read_until(b'\n', &mut line) {
+                // EOF == A line consisting of a single newline control character
                 Ok(0) => break,
                 Ok(_) => {
                     let text = String::from_utf8_lossy(&line);
+                    // Save space and screen real estate by only including the first
+                    // carriage return or newline character encountered in log output
                     println!("{tag} {}", text.trim_end_matches(['\r', '\n']));
                 }
                 Err(_) => break,
