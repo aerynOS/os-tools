@@ -22,7 +22,7 @@ pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
 mod fetch;
 
 /// Identifies a task, unique across the whole process
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 pub struct Id(u64);
 
 impl Id {
