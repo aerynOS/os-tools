@@ -35,7 +35,7 @@ impl Id {
 /// A unit of work moss reports on
 ///
 /// The implementing type describes the task and is reported once when it starts.
-/// Tying phases, details and the outcome to the task means only valid updates
+/// Tying phases, details and the output to the task means only valid updates
 /// can be reported for it.
 pub trait Task: fmt::Debug + Serialize + Sized {
     /// What the task is doing right now, one at a time
@@ -43,7 +43,7 @@ pub trait Task: fmt::Debug + Serialize + Sized {
     /// A fact found or decided while the task runs
     type Detail: fmt::Debug + Serialize;
     /// What the task came to when it completed
-    type Outcome: fmt::Debug + Serialize;
+    type Output: fmt::Debug + Serialize;
 
     fn into_event(update: Update<Self>) -> Event;
 }
@@ -82,7 +82,7 @@ pub enum Update<T: Task> {
     /// A fact found or decided while the task runs
     Detail { id: Id, detail: T::Detail },
     /// The task finished successfully
-    Completed { id: Id, outcome: T::Outcome },
+    Completed { id: Id, output: T::Output },
     /// The task stopped before finishing, such as from an error
     Aborted { id: Id },
 }
@@ -144,9 +144,9 @@ impl<'p, T: Task> Handle<'p, T> {
     }
 
     /// Report that the task finished successfully
-    pub fn complete_task(mut self, outcome: T::Outcome) {
+    pub fn complete_task(mut self, output: T::Output) {
         self.finished = true;
-        emit(self.publisher, Update::<T>::Completed { id: self.id, outcome });
+        emit(self.publisher, Update::<T>::Completed { id: self.id, output });
     }
 }
 

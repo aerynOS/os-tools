@@ -17,7 +17,7 @@ pub struct FetchPackages {
 impl Task for FetchPackages {
     type Phase = ();
     type Detail = ();
-    type Outcome = ();
+    type Output = ();
 
     fn into_event(update: Update<Self>) -> Event {
         Event::FetchPackages(update)
@@ -39,7 +39,7 @@ pub struct FetchedPackage {
 impl Task for FetchPackage {
     type Phase = ();
     type Detail = ();
-    type Outcome = FetchedPackage;
+    type Output = FetchedPackage;
 
     fn into_event(update: Update<Self>) -> Event {
         Event::FetchPackage(update)

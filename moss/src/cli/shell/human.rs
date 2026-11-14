@@ -75,7 +75,7 @@ impl Human {
                 self.insert(*id, progress_bar, task.name.to_string());
             }
             task::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            task::Update::Completed { id, outcome } => {
+            task::Update::Completed { id, output } => {
                 let Some(task_progress) = self.remove(*id) else {
                     return;
                 };
@@ -88,7 +88,7 @@ impl Human {
                         "{} {} {}",
                         "Fetched".green(),
                         task_progress.label.as_str().bold(),
-                        relative_to_cwd(&outcome.path).display()
+                        relative_to_cwd(&output.path).display()
                     );
                 });
             }
