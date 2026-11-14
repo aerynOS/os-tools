@@ -26,9 +26,9 @@ mod fetch;
 pub struct Id(u64);
 
 impl Id {
-    fn next() -> Self {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    fn new() -> Self {
+        static LAST_ID: AtomicU64 = AtomicU64::new(0);
+        Self(LAST_ID.fetch_add(1, Ordering::Relaxed))
     }
 }
 
@@ -109,7 +109,7 @@ pub struct Handle<'p, T: Task> {
 
 impl<'p, T: Task> Handle<'p, T> {
     pub(super) fn new(publisher: &'p Publisher, parent: Option<Id>, task: T) -> Self {
-        let id = Id::next();
+        let id = Id::new();
 
         emit(publisher, Update::Started { id, parent, task });
 
