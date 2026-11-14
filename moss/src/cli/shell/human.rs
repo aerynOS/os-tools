@@ -50,7 +50,7 @@ impl Human {
             task::Update::Completed { id, .. } | task::Update::Aborted { id } => {
                 self.remove(*id);
             }
-            task::Update::Phase { .. } | task::Update::Detail { .. } => {}
+            task::Update::Detail { .. } => {}
         }
     }
 
@@ -95,7 +95,7 @@ impl Human {
             task::Update::Aborted { id } => {
                 self.remove(*id);
             }
-            task::Update::Phase { .. } | task::Update::Detail { .. } => {}
+            task::Update::Detail { .. } => {}
         }
     }
 

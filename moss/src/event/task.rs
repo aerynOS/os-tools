@@ -70,8 +70,6 @@ pub enum Update<T: Task> {
         #[serde(rename = "data")]
         task: T,
     },
-    /// The task moved to a new phase
-    Phase { id: Id, phase: T::Phase },
     /// How far along the task is
     ///
     /// Each update carries the full position, so dropping updates is safe.
