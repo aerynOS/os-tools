@@ -15,26 +15,42 @@ use crate::{Macros, Paths, Recipe, architecture::BuildTarget};
 use super::{Error, pgo_dir, work_dir};
 
 pub fn list(pgo_stage: Option<pgo::Stage>) -> Vec<Phase> {
-    if matches!(pgo_stage, Some(pgo::Stage::One | pgo::Stage::Two)) {
-        Phase::WORKLOAD.to_vec()
-    } else {
-        Phase::NORMAL.to_vec()
+    match pgo_stage {
+        Some(pgo::Stage::One) | Some(pgo::Stage::Two) => Phase::PGO.to_vec(),
+        Some(pgo::Stage::Use) | None => Phase::BUILD.to_vec(),
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::Display)]
 pub enum Phase {
+    /// Prepares the source for building. It is run only once
+    /// for each target profile.
     Prepare,
+
+    /// Invokes the build system to configure how the final binaries are built.
+    /// Simple sources may skip this phase and go straight to compilation.
+    /// When profile-guided optimization is enabled, the setup phase is run
+    /// for each PGO pass.
     Setup,
+
+    /// Compiles the source into the final binaries.
     Build,
+
+    /// Installs the final binaries and static data (if any) into destination directories.
     Install,
+
+    /// Executes tests to validate the final binaries comply with the expected behavior.
     Check,
+
+    /// Runs a workload to gather profiling information that will be fed to
+    /// the profile-guided optimizer.
+    /// The workload is often, but not necessarily, a battery of unit tests.
     Workload,
 }
 
 impl Phase {
-    const NORMAL: &'static [Self] = &[Phase::Prepare, Phase::Setup, Phase::Build, Phase::Install, Phase::Check];
-    const WORKLOAD: &'static [Self] = &[Phase::Prepare, Phase::Setup, Phase::Build, Phase::Workload];
+    const BUILD: &[Self] = &[Phase::Setup, Phase::Build, Phase::Install, Phase::Check];
+    const PGO: &[Self] = &[Phase::Setup, Phase::Build, Phase::Workload];
 
     pub fn abbrev(&self) -> &str {
         match self {
@@ -63,6 +79,19 @@ impl Phase {
         .to_string()
     }
 
+    pub fn base_script(
+        target: BuildTarget,
+        pgo_stage: Option<pgo::Stage>,
+        recipe: &Recipe,
+        paths: &Paths,
+        macros: &Macros,
+        ccache: bool,
+    ) -> Result<ScriptBundle, Error> {
+        let (env, prefix) = Self::env_prefix(target, pgo_stage, recipe, paths, macros, ccache)?;
+        let expr = stone_script::Expr::parse("")?;
+        Ok(ScriptBundle::build(env, &prefix, &expr)?)
+    }
+
     pub fn script(
         &self,
         target: BuildTarget,
@@ -76,7 +105,7 @@ impl Phase {
         let target_build = recipe.build_target_definition(target);
 
         let Some(content) = (match self {
-            Phase::Prepare => Some(String::new()),
+            Phase::Prepare => target_build.prepare.clone().or_else(|| root_build.prepare.clone()),
             Phase::Setup => target_build.setup.clone().or_else(|| root_build.setup.clone()),
             Phase::Build => target_build.build.clone().or_else(|| root_build.build.clone()),
             Phase::Check => target_build.check.clone().or_else(|| root_build.check.clone()),
@@ -99,13 +128,22 @@ impl Phase {
             return Ok(None);
         };
 
+        let (env, prefix) = Self::env_prefix(target, pgo_stage, recipe, paths, macros, ccache)?;
+        let expr = stone_script::Expr::parse(&content)?;
+        Ok(Some(ScriptBundle::build(env, &prefix, &expr)?))
+    }
+
+    pub fn env_prefix(
+        target: BuildTarget,
+        pgo_stage: Option<pgo::Stage>,
+        recipe: &Recipe,
+        paths: &Paths,
+        macros: &Macros,
+        ccache: bool,
+    ) -> Result<(stone_script::ScriptEnv, stone_script::Expr), Error> {
         let build_target = target.to_string();
         let build_dir = paths.build().guest.join(&build_target);
-        let work_dir = if matches!(self, Phase::Prepare) {
-            build_dir.clone()
-        } else {
-            work_dir(&build_dir, &recipe.parsed.upstreams)
-        };
+        let work_dir = work_dir(&build_dir, &recipe.parsed.upstreams);
         let num_jobs = util::num_cpus();
 
         let mut env = macros.create_script_env(["base", &build_target])?;
@@ -219,19 +257,19 @@ impl Phase {
 
         add_tuning(target, pgo_stage, recipe, macros, &mut env)?;
 
+        let target_build = recipe.build_target_definition(target);
+        let root_build = &recipe.parsed.build;
+
         let mut prefix = target_build
             .environment
             .as_deref()
             .or(root_build.environment.as_deref())
-            .filter(|env| *env != "(null)" && !env.is_empty() && !matches!(self, Phase::Prepare))
+            .filter(|env| *env != "(null)" && !env.is_empty())
             .unwrap_or_default()
             .to_owned();
         prefix = format!("%scriptBase\n{prefix}\n");
 
-        let prefix = stone_script::Expr::parse(&prefix)?;
-        let expr = stone_script::Expr::parse(&content)?;
-
-        Ok(Some(ScriptBundle::build(env, &prefix, &expr)?))
+        Ok((env, stone_script::Expr::parse(&prefix)?))
     }
 }
 
@@ -376,4 +414,17 @@ fn default_tuning_groups(target: BuildTarget, macros: &Macros) -> &[String] {
     }
 
     &[]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prepare_phase_runs_only_once() {
+        assert!(!list(None).contains(&Phase::Prepare));
+        assert!(!list(Some(pgo::Stage::One)).contains(&Phase::Prepare));
+        assert!(!list(Some(pgo::Stage::Two)).contains(&Phase::Prepare));
+        assert!(!list(Some(pgo::Stage::Use)).contains(&Phase::Prepare));
+    }
 }

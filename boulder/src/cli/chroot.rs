@@ -51,22 +51,17 @@ pub fn handle(command: Command, env: Env) -> Result<(), Error> {
 
     // Generate a script so we can inject a .profile
     // to the container environment with all actions
-    // and definitions
-    //
-    // The phase doesn't matter, but we use `prepare`
-    // since it uses hardcoded content that's always
-    // available to create a script from
-    let script = build::job::Phase::Prepare
-        .script(
-            BuildTarget::Native(architecture::host()),
-            None,
-            &recipe,
-            &paths,
-            &macros,
-            false,
-        )
-        .map_err(Error::BuildScript)?
-        .expect("script always available for prepare phase");
+    // and definitions.
+    let script = build::job::Phase::base_script(
+        BuildTarget::Native(architecture::host()),
+        None,
+        &recipe,
+        &paths,
+        &macros,
+        false,
+    )
+    .map_err(Error::BuildScript)?;
+
     let profile = &build::format_profile(&script)?;
 
     let home = &paths.build().guest;

@@ -47,6 +47,7 @@ pub struct Builder {
 }
 
 pub struct Target {
+    pub prepare: Option<ScriptBundle>,
     pub build_target: BuildTarget,
     pub jobs: Vec<Job>,
 }
@@ -75,6 +76,8 @@ impl Builder {
         let targets = build_targets
             .into_iter()
             .map(|build_target| {
+                let prepare = job::Phase::Prepare.script(build_target, None, &recipe, &paths, &macros, ccache)?;
+
                 let stages = pgo::stages(&recipe, build_target)
                     .map(|stages| stages.into_iter().map(Some).collect::<Vec<_>>())
                     .unwrap_or_else(|| vec![None]);
@@ -84,7 +87,11 @@ impl Builder {
                     .map(|stage| Job::new(build_target, stage, &recipe, &paths, &macros, ccache))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                Ok(Target { build_target, jobs })
+                Ok(Target {
+                    prepare,
+                    build_target,
+                    jobs,
+                })
             })
             .collect::<Result<Vec<_>, job::Error>>()?;
 
@@ -108,6 +115,10 @@ impl Builder {
     pub fn extra_deps(&self) -> Result<Vec<String>, Error> {
         let mut dependencies = BTreeSet::new();
         for target in &self.targets {
+            if let Some(script) = &target.prepare {
+                dependencies.extend(script.dependencies().iter().cloned());
+            }
+
             for job in &target.jobs {
                 for script in job.phases.values() {
                     dependencies.extend(script.dependencies().iter().cloned());
@@ -268,18 +279,37 @@ impl Builder {
         }
 
         for (i, job) in target.jobs.iter().enumerate() {
-            let is_pgo = job.pgo_stage.is_some();
+            let mut script_env = ScriptEnv {
+                build_dir: &job.build_dir,
+                current_dir: if job.work_dir.exists() {
+                    &job.work_dir
+                } else {
+                    &job.build_dir
+                },
+                target: job.target,
+                phase: job::Phase::Prepare,
+                is_pgo: false,
+            };
 
+            if i == 0
+                && let Some(prep) = &target.prepare
+            {
+                let timer = timing.begin(timing::Kind::Build(timing::Build {
+                    target: job.target,
+                    pgo_stage: None,
+                    phase: script_env.phase,
+                }));
+                self.run_script(prep, &script_env)?;
+                timing.finish(timer);
+            }
+
+            script_env.is_pgo = job.pgo_stage.is_some();
             if let Some(stage) = job.pgo_stage {
                 println!("{}", pgo_stage_prefix(stage, i));
             }
 
             for (i, (phase, script)) in job.phases.iter().enumerate() {
-                println!("{}", phase_prefix(*phase, is_pgo, i));
-
-                let build_dir = &job.build_dir;
-                let work_dir = &job.work_dir;
-                let current_dir = if work_dir.exists() { &work_dir } else { &build_dir };
+                println!("{}", phase_prefix(*phase, script_env.is_pgo, i));
 
                 let timer = timing.begin(timing::Kind::Build(timing::Build {
                     target: job.target,
@@ -287,81 +317,88 @@ impl Builder {
                     phase: *phase,
                 }));
 
-                for command in script.commands() {
-                    match command {
-                        &stone_script::Command::Breakpoint { line_num, exit } => {
-                            let line_num = breakpoint_line(line_num, &self.recipe, job.target, *phase)
-                                .map(|line_num| format!(" at line {line_num}"))
-                                .unwrap_or_default();
+                script_env.phase = *phase;
+                self.run_script(script, &script_env)?;
 
-                            println!(
-                                "\n{}{line_num} {}",
-                                "Breakpoint".bold(),
-                                if exit { "(exit)".dim() } else { "(continue)".dim() },
-                            );
+                timing.finish(timer);
+            }
+        }
+        Ok(())
+    }
 
-                            // Write env to $HOME/.profile
-                            let profile = format_profile(script)?;
-                            fs::write(build_dir.join(".profile"), profile)?;
+    fn run_script<'a>(&self, script: &ScriptBundle, env: &ScriptEnv<'a>) -> Result<(), Error> {
+        for command in script.commands() {
+            match command {
+                &stone_script::Command::Breakpoint { line_num, exit } => {
+                    let line_num = breakpoint_line(line_num, &self.recipe, env.target, env.phase)
+                        .map(|line_num| format!(" at line {line_num}"))
+                        .unwrap_or_default();
 
-                            let mut command = process::Command::new("/usr/bin/bash")
-                                .arg("--login")
-                                .env_clear()
-                                .env("HOME", build_dir)
-                                .env("PATH", "/usr/bin:/usr/sbin")
-                                .env("TERM", "xterm-256color")
-                                .current_dir(current_dir)
-                                .spawn()?;
+                    println!(
+                        "\n{}{line_num} {}",
+                        "Breakpoint".bold(),
+                        if exit { "(exit)".dim() } else { "(continue)".dim() },
+                    );
 
-                            command.wait()?;
+                    // Write env to $HOME/.profile
+                    let profile = format_profile(script)?;
+                    fs::write(env.build_dir.join(".profile"), profile)?;
 
-                            if exit {
-                                return Err(Error::BreakpointExit);
+                    let mut command = process::Command::new("/usr/bin/bash")
+                        .arg("--login")
+                        .env_clear()
+                        .env("HOME", env.build_dir)
+                        .env("PATH", "/usr/bin:/usr/sbin")
+                        .env("TERM", "xterm-256color")
+                        .current_dir(env.current_dir)
+                        .spawn()?;
+
+                    command.wait()?;
+
+                    if exit {
+                        return Err(Error::BreakpointExit);
+                    }
+                }
+                stone_script::Command::Output { output: content } => {
+                    // TODO: Proper temp file
+                    let script_path = "/tmp/script";
+
+                    {
+                        let mut file = fs::File::create(script_path)?;
+                        writeln!(file, "{content}\n")?;
+                    }
+
+                    let result = logged(env.phase, env.is_pgo, "/usr/bin/bash", |command| {
+                        command
+                            .arg(script_path)
+                            .env_clear()
+                            .env("HOME", env.build_dir)
+                            .env("PATH", "/usr/bin:/usr/sbin")
+                            .current_dir(env.current_dir)
+                    })?;
+
+                    if !result.success() {
+                        match result.code() {
+                            Some(code) => {
+                                return Err(Error::Code(code));
                             }
-                        }
-                        stone_script::Command::Output { output: content } => {
-                            // TODO: Proper temp file
-                            let script_path = "/tmp/script";
-
-                            {
-                                let mut file = fs::File::create(script_path)?;
-                                writeln!(file, "{content}\n")?;
-                            }
-
-                            let result = logged(*phase, is_pgo, "/usr/bin/bash", |command| {
-                                command
-                                    .arg(script_path)
-                                    .env_clear()
-                                    .env("HOME", build_dir)
-                                    .env("PATH", "/usr/bin:/usr/sbin")
-                                    .current_dir(current_dir)
-                            })?;
-
-                            if !result.success() {
-                                match result.code() {
-                                    Some(code) => {
-                                        return Err(Error::Code(code));
-                                    }
-                                    None => {
-                                        if let Some(signal) = result
-                                            .signal()
-                                            .or_else(|| result.stopped_signal())
-                                            .and_then(|i| Signal::try_from(i).ok())
-                                        {
-                                            return Err(Error::Signal(signal));
-                                        } else {
-                                            return Err(Error::UnknownSignal);
-                                        }
-                                    }
+                            None => {
+                                if let Some(signal) = result
+                                    .signal()
+                                    .or_else(|| result.stopped_signal())
+                                    .and_then(|i| Signal::try_from(i).ok())
+                                {
+                                    return Err(Error::Signal(signal));
+                                } else {
+                                    return Err(Error::UnknownSignal);
                                 }
                             }
                         }
                     }
                 }
-
-                timing.finish(timer);
             }
         }
+
         Ok(())
     }
 }
@@ -387,6 +424,14 @@ pub fn phase_prefix(phase: job::Phase, is_pgo: bool, i: usize) -> String {
     let newline = if i > 0 { format!("{pipes}\n") } else { String::default() };
 
     format!("{newline}{pipes}{}", phase.styled(phase))
+}
+
+struct ScriptEnv<'a> {
+    build_dir: &'a Path,
+    current_dir: &'a Path,
+    target: BuildTarget,
+    phase: job::Phase,
+    is_pgo: bool,
 }
 
 fn logged(
@@ -514,8 +559,7 @@ fn breakpoint_line(line_num: usize, recipe: &Recipe, build_target: BuildTarget, 
         });
 
     let phase = match phase {
-        // Internal phase, no breakpoint will occur
-        job::Phase::Prepare => return None,
+        job::Phase::Prepare => "prepare",
         job::Phase::Setup => "setup",
         job::Phase::Build => "build",
         job::Phase::Install => "install",
