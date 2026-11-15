@@ -5,7 +5,11 @@ use std::{collections::HashMap, path::Path, sync::Mutex, time::Duration};
 
 use moss::{
     Event,
-    event::{self, task},
+    event::{
+        self,
+        pkg_fetch::{self, FetchPackages, PkgFetch},
+        task,
+    },
 };
 use tui::{MultiProgress, ProgressBar, ProgressStyle, Styled};
 
@@ -24,19 +28,22 @@ struct TaskProgress {
 
 impl event::Subscriber for Human {
     fn event(&self, event: &Event) {
+        // FIXME: Unnest these?
         match event {
-            Event::FetchPackages(update) => self.fetch_packages(update),
-            Event::FetchPackage(update) => self.fetch_package(update),
+            Event::PkgFetch(PkgFetch::FetchPackagesTask(update)) => self.fetch_packages(update),
+            Event::PkgFetch(PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update))) => {
+                self.fetch_package(update);
+            }
         }
     }
 }
 
 impl Human {
-    fn fetch_packages(&self, update: &task::Update<task::FetchPackages>) {
+    fn fetch_packages(&self, update: &event::Update<pkg_fetch::PackagesInfo>) {
         match update {
-            task::Update::Started { id, task, .. } => {
+            event::Update::Started { id, info, .. } => {
                 let progress_bar = self.multi_progress.add(
-                    ProgressBar::new(task.count).with_style(
+                    ProgressBar::new(info.count).with_style(
                         ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
                             .unwrap()
                             .progress_chars("■≡=- "),
@@ -46,19 +53,19 @@ impl Human {
 
                 self.insert(*id, progress_bar, String::new());
             }
-            task::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            task::Update::Completed { id, .. } | task::Update::Aborted { id } => {
+            event::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
+            event::Update::Completed { id, .. } | event::Update::Aborted { id } => {
                 self.remove(*id);
             }
-            task::Update::Detail { .. } => {}
+            event::Update::Detail { .. } => {}
         }
     }
 
-    fn fetch_package(&self, update: &task::Update<task::FetchPackage>) {
+    fn fetch_package(&self, update: &event::Update<pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
         match update {
-            task::Update::Started { id, parent, task } => {
+            event::Update::Started { id, parent, info } => {
                 let progress_bar = ProgressBar::new(0)
-                    .with_message(format!("{} {}", "Downloading".blue(), task.name.as_str().bold()))
+                    .with_message(format!("{} {}", "Downloading".blue(), info.name.as_str().bold()))
                     .with_style(
                         ProgressStyle::with_template(
                             " {spinner} |{percent:>3}%| {wide_msg} {binary_bytes_per_sec:>.dim} ",
@@ -72,10 +79,10 @@ impl Human {
                 };
                 progress_bar.enable_steady_tick(Duration::from_millis(150));
 
-                self.insert(*id, progress_bar, task.name.to_string());
+                self.insert(*id, progress_bar, info.name.to_string());
             }
-            task::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            task::Update::Completed { id, output } => {
+            event::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
+            event::Update::Completed { id, output } => {
                 let Some(task_progress) = self.remove(*id) else {
                     return;
                 };
@@ -92,10 +99,10 @@ impl Human {
                     );
                 });
             }
-            task::Update::Aborted { id } => {
+            event::Update::Aborted { id } => {
                 self.remove(*id);
             }
-            task::Update::Detail { .. } => {}
+            event::Update::Detail { .. } => {}
         }
     }
 

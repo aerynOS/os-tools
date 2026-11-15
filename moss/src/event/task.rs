@@ -1,215 +1,196 @@
 // SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-//! A running task is reported on through its [`Handle`]. Each update about it is
-//! sent as an [`Update`], wrapped in an [`Event`].
+// Standard Library Imports
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use std::{
-    fmt,
-    marker::PhantomData,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
-};
-
+// External Crate Imports
+use derive_more::Display;
 use serde::Serialize;
 
-use super::Publisher;
+// Local Crate Imports
+use crate::{
+    Event,
+    event::{Publisher, Unit, Update},
+};
 
-pub use self::fetch::{FetchPackage, FetchPackages, FetchedPackage};
+// Public API ==========================================================================================================
 
-mod fetch;
-
+// MISSING: `Id` should _not_ be user-constructable, so `Default` has been omitted.
 /// Identifies a task, unique across the whole process
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Serialize)]
 pub struct Id(u64);
 
-impl Id {
-    fn new() -> Self {
-        static LAST_ID: AtomicU64 = AtomicU64::new(0);
-        Self(LAST_ID.fetch_add(1, Ordering::Relaxed))
-    }
-}
+// Crate-Public API ====================================================================================================
 
-/// A unit of work moss reports on
-///
-/// The implementing type describes the task and is reported once when it starts.
-/// Tying phases, details and the output to the task means only valid updates
-/// can be reported for it.
-pub trait Task: fmt::Debug + Serialize + Sized {
-    /// What the task is doing right now, one at a time
-    type Phase: fmt::Debug + Serialize;
-    /// A fact found or decided while the task runs
-    type Detail: fmt::Debug + Serialize;
-    /// What the task came to when it completed
-    type Output: fmt::Debug + Serialize;
-
-    fn into_event(update: Update<Self>) -> Event;
-}
-
-/// An [`Update`] about one of moss's tasks
-#[derive(Debug, Serialize)]
-#[serde(tag = "task", rename_all = "snake_case")]
-pub enum Event {
-    FetchPackages(Update<FetchPackages>),
-    FetchPackage(Update<FetchPackage>),
-}
-
-/// A single update about a task
-///
-/// A task always sends [`Update::Started`] first and either [`Update::Completed`]
-/// or [`Update::Aborted`] last.
-#[derive(Debug, Serialize)]
-#[serde(tag = "update", rename_all = "snake_case")]
-pub enum Update<T: Task> {
-    /// The task started, nested under `parent` if it has one
-    Started {
-        id: Id,
-        parent: Option<Id>,
-        #[serde(rename = "data")]
-        task: T,
-    },
-    /// How far along the task is
-    ///
-    /// Each update carries the full position, so dropping updates is safe.
-    Progress {
-        id: Id,
-        current: u64,
-        total: Option<u64>,
-        unit: Unit,
-    },
-    /// A fact found or decided while the task runs
-    Detail { id: Id, detail: T::Detail },
-    /// The task finished successfully
-    Completed { id: Id, output: T::Output },
-    /// The task stopped before finishing, such as from an error
-    Aborted { id: Id },
-}
-
-/// What an [`Update::Progress`] counts
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Unit {
-    Items,
-    Bytes,
-}
-
-/// Reports on a running task
-///
-/// Dropping a handle without completing it reports [`Update::Aborted`], so a task
+/// Dropping a `Task` without completing it reports [`Update::Aborted`], so a task
 /// left early by `?` is still finished for subscribers.
 #[must_use]
-pub struct Handle<'p, T: Task> {
+pub(crate) struct Task<'p, I, O, D, E> {
     id: Id,
-    publisher: &'p Publisher,
     finished: bool,
-    _task: PhantomData<fn() -> T>,
+    scope: &'p Scope<'p, E>,
+    from_update: Box<dyn Fn(Update<I, O, D>) -> E + 'p>,
 }
 
-impl<'p, T: Task> Handle<'p, T> {
-    pub(super) fn new(publisher: &'p Publisher, parent: Option<Id>, task: T) -> Self {
-        let id = Id::new();
+impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
+    pub fn child_scope<E2: 'p>(&'p self, subevent_wrapper: fn(E2) -> E) -> Scope<'p, E2> {
+        let parent = Some(self.id);
+        let publisher = self.scope.publisher;
+        let to_event = &self.scope.to_event;
+        let to_event = Box::new(move |se| to_event(subevent_wrapper(se)));
 
-        emit(publisher, Update::Started { id, parent, task });
-
-        Self {
-            id,
+        Scope {
+            parent,
             publisher,
-            finished: false,
-            _task: PhantomData,
+            to_event,
         }
-    }
-
-    /// Start a task nested under this one
-    pub fn start_subtask<S: Task>(&'p self, task: S) -> Handle<'p, S> {
-        Handle::new(self.publisher, Some(self.id), task)
     }
 
     /// Start reporting progress towards `total`, beginning at zero
-    ///
-    /// Call again with a new total when the task starts counting something else,
-    /// such as after moving to a new phase.
-    pub fn start_progress(&'p self, total: Option<u64>, unit: Unit) -> Progress<'p, T> {
-        let progress = Progress {
-            id: self.id,
-            publisher: self.publisher,
-            current: Arc::new(AtomicU64::new(0)),
-            total,
-            unit,
-            _task: PhantomData,
-        };
-        progress.emit(0);
-        progress
+    pub fn start_progress(&'p self, total: Option<u64>, unit: Unit) -> Progress<'p, I, O, D, E> {
+        Progress::new(self, total, unit)
     }
 
     /// Report that the task finished successfully
-    pub fn complete_task(mut self, output: T::Output) {
+    pub fn complete_task(mut self, output: O) {
+        let id = self.id;
+
         self.finished = true;
-        emit(self.publisher, Update::<T>::Completed { id: self.id, output });
+        self.publish_update(Update::Completed { id, output });
     }
 }
 
-impl<T: Task> Drop for Handle<'_, T> {
+impl<'p, I, O, D, E> Drop for Task<'p, I, O, D, E> {
     fn drop(&mut self) {
+        let id = self.id;
+
         if !self.finished {
-            emit(self.publisher, Update::<T>::Aborted { id: self.id });
+            self.publish_update(Update::Aborted { id });
         }
     }
 }
 
-/// Reports progress of a task
-///
-/// Cheap to clone and safe to share between threads, so parallel work can report
-/// progress without passing around the task's [`Handle`].
-pub struct Progress<'p, T: Task> {
-    id: Id,
+// ---------------------------------------------------------------------------------------------------------------------
+
+pub(crate) struct Scope<'p, E> {
+    parent: Option<Id>,
     publisher: &'p Publisher,
-    current: Arc<AtomicU64>,
-    total: Option<u64>,
-    unit: Unit,
-    _task: PhantomData<fn() -> T>,
+    to_event: Box<dyn Fn(E) -> Event + 'p>,
 }
 
-impl<T: Task> Progress<'_, T> {
-    /// Set the current position
+impl<'p, E> Scope<'p, E> {
+    pub fn root(publisher: &'p Publisher, to_event: fn(E) -> Event) -> Self
+    where
+        E: 'p,
+    {
+        let parent = None;
+        let to_event = Box::new(to_event);
+
+        Self {
+            parent,
+            publisher,
+            to_event,
+        }
+    }
+
+    pub fn start_task<I: 'p, O: 'p, D: 'p>(
+        &'p self,
+        from_update: fn(Update<I, O, D>) -> E,
+        info: I,
+    ) -> Task<'p, I, O, D, E> {
+        Task::new(self, from_update, info)
+    }
+}
+
+pub(crate) struct Progress<'p, I, O, D, E> {
+    task: &'p Task<'p, I, O, D, E>,
+    current: AtomicU64,
+    total: Option<u64>,
+    unit: Unit,
+}
+
+impl<'p, I, O, D, E> Progress<'p, I, O, D, E> {
     pub fn set(&self, current: u64) {
         self.current.store(current, Ordering::Relaxed);
-        self.emit(current);
+        self.publish_update();
     }
 
     /// Move the position forward by `delta`
-    pub fn inc(&self, delta: u64) {
-        let current = self.current.fetch_add(delta, Ordering::Relaxed) + delta;
-        self.emit(current);
-    }
-
-    fn emit(&self, current: u64) {
-        emit(
-            self.publisher,
-            Update::<T>::Progress {
-                id: self.id,
-                current,
-                total: self.total,
-                unit: self.unit,
-            },
-        );
+    pub fn increment(&self, delta: u64) {
+        self.current.fetch_add(delta, Ordering::Relaxed);
+        self.publish_update();
     }
 }
 
-impl<T: Task> Clone for Progress<'_, T> {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            publisher: self.publisher,
-            current: self.current.clone(),
-            total: self.total,
-            unit: self.unit,
-            _task: PhantomData,
-        }
+// Private Implementations =============================================================================================
+
+impl Id {
+    fn new() -> Self {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+
+        Self(id)
     }
 }
 
-fn emit<T: Task>(publisher: &Publisher, update: Update<T>) {
-    publisher.publish(T::into_event(update));
+impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
+    fn new(scope: &'p Scope<'p, E>, from_update: fn(Update<I, O, D>) -> E, info: I) -> Self
+    where
+        I: 'p,
+        O: 'p,
+        D: 'p,
+    {
+        let id = Id::new();
+        let finished = false;
+        let from_update = Box::new(from_update);
+        let task = Self {
+            id,
+            finished,
+            scope,
+            from_update,
+        };
+
+        let parent = scope.parent;
+        task.publish_update(Update::Started { id, parent, info });
+
+        task
+    }
+
+    fn publish_update(&self, update: Update<I, O, D>) {
+        let to_event = &self.scope.to_event;
+        let from_update = &self.from_update;
+        let event = to_event(from_update(update));
+
+        self.scope.publisher.publish(event);
+    }
+}
+
+impl<'p, I, O, D, E> Progress<'p, I, O, D, E> {
+    fn new(task: &'p Task<'p, I, O, D, E>, total: Option<u64>, unit: Unit) -> Self {
+        let current = AtomicU64::new(0);
+        let progress = Self {
+            task,
+            current,
+            total,
+            unit,
+        };
+
+        progress.publish_update();
+        progress
+    }
+
+    fn publish_update(&self) {
+        let id = self.task.id;
+        let current = self.current.load(Ordering::Relaxed);
+        let total = self.total;
+        let unit = self.unit;
+
+        self.task.publish_update(Update::Progress {
+            id,
+            current,
+            total,
+            unit,
+        });
+    }
 }

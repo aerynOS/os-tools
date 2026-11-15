@@ -17,7 +17,11 @@ use tui::{
 use url::{ParseError, Url};
 
 use crate::{
-    Client, Package, Provider, client, environment, event,
+    Client, Event, Package, Provider, client, environment,
+    event::{
+        self,
+        pkg_fetch::{self, PkgFetch},
+    },
     package::{self, Flags, Meta},
     request, runtime, util,
 };
@@ -51,17 +55,25 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
     instant = Instant::now();
 
-    let fetch_packages = client.events.start_task(event::task::FetchPackages {
-        count: total_packages as u64,
-    });
-    let total_progress = fetch_packages.start_progress(Some(total_packages as u64), event::task::Unit::Items);
+    let pkg_fetch = client.events.root_scope(Event::PkgFetch);
+    let fetch_packages_task = pkg_fetch.start_task(
+        PkgFetch::FetchPackagesTask,
+        pkg_fetch::PackagesInfo {
+            count: total_packages as u64,
+        },
+    );
+    let total_progress = fetch_packages_task.start_progress(Some(total_packages as u64), event::Unit::Items);
 
     runtime::block_on(async {
         let stream = stream::iter(&input).map(|pkg| async {
-            let fetch_package = fetch_packages.start_subtask(event::task::FetchPackage {
-                name: pkg.meta.name.clone(),
-            });
-            let progress = fetch_package.start_progress(pkg.meta.download_size, event::task::Unit::Bytes);
+            let fetch_packages = fetch_packages_task.child_scope(PkgFetch::FetchPackages);
+            let fetch_package_task = fetch_packages.start_task(
+                pkg_fetch::FetchPackages::FetchPackageTask,
+                pkg_fetch::PackageInfo {
+                    name: pkg.meta.name.clone(),
+                },
+            );
+            let progress = fetch_package_task.start_progress(pkg.meta.download_size, event::Unit::Bytes);
 
             let uri = Url::parse(
                 pkg.meta
@@ -80,9 +92,9 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
                 .await
                 .map_err(|err| Error::FetchPackage(err, pkg.meta.name.clone()))?;
 
-            fetch_package.complete_task(event::task::FetchedPackage { path: dest_path });
+            fetch_package_task.complete_task(pkg_fetch::PackageOutput { path: dest_path });
 
-            total_progress.inc(1);
+            total_progress.increment(1);
 
             Ok(()) as Result<(), Error>
         });
@@ -92,7 +104,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
         buffered.try_collect::<()>().await
     })?;
 
-    fetch_packages.complete_task(());
+    fetch_packages_task.complete_task(());
 
     timing.fetch = instant.elapsed();
 

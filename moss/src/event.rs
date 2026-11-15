@@ -7,11 +7,66 @@
 //! present them, such as progress bars, json or nothing at all. This also gives
 //! users a typed API instead of text to parse.
 
-pub(crate) use self::publisher::Publisher;
-pub use self::subscriber::Subscriber;
-pub use self::task::Event;
-pub use self::task::Task;
-
+pub mod pkg_fetch;
 mod publisher;
-pub mod subscriber;
+mod subscriber;
 pub mod task;
+
+// Re-Exports
+pub(crate) use publisher::Publisher;
+pub use subscriber::Subscriber;
+
+// External Crate Imports
+use derive_more::Display;
+use serde::Serialize;
+
+// Local Crate Imports
+use crate::event::pkg_fetch::PkgFetch;
+
+// Public API ==========================================================================================================
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Event {
+    PkgFetch(PkgFetch),
+}
+
+/// A single update about a task
+///
+/// A task always sends [`Update::Started`] first and either [`Update::Completed`]
+/// or [`Update::Aborted`] last.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
+#[serde(tag = "update", rename_all = "snake_case")]
+pub enum Update<I = (), O = (), D = ()> {
+    /// The task started, nested under `parent` if it has one
+    Started {
+        id: task::Id,
+        parent: Option<task::Id>,
+        info: I,
+    },
+    /// How far along the task is
+    ///
+    /// Each update carries the full position, so dropping updates is safe.
+    Progress {
+        id: task::Id,
+        current: u64,
+        total: Option<u64>,
+        unit: Unit,
+    },
+    /// A fact found or decided while the task runs
+    Detail { id: task::Id, detail: D },
+    /// The task finished successfully
+    Completed { id: task::Id, output: O },
+    /// The task stopped before finishing, such as from an error
+    Aborted { id: task::Id },
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+/// What an [`Update::Progress`] counts
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Unit {
+    Items,
+    Bytes,
+}

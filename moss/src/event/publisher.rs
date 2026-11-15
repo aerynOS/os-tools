@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use super::{Event, Subscriber, Task, task};
+use crate::event::task::Scope;
+
+use super::{Event, Subscriber};
 
 pub struct Publisher {
     subscribers: Vec<Box<dyn Subscriber>>,
@@ -23,7 +25,7 @@ impl Publisher {
         }
     }
 
-    pub fn start_task<'p, T: Task>(&'p self, task: T) -> task::Handle<'p, T> {
-        task::Handle::new(self, None, task)
+    pub fn root_scope<'p, E: 'p>(&'p self, to_event: fn(E) -> Event) -> Scope<'p, E> {
+        Scope::root(self, to_event)
     }
 }
