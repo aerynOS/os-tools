@@ -22,6 +22,7 @@ tui = { path = "../crates/tui" }
 vfs = { path = "../crates/vfs" }
 
 astr.workspace = true
+atomic-time.workspace = true
 blsforme.workspace = true
 camino.workspace = true
 chrono.workspace = true

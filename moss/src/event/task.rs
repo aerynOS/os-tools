@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // Standard Library Imports
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::{Duration, Instant},
+};
 
 // External Crate Imports
+use atomic_time::AtomicOptionInstant;
 use derive_more::Display;
 use serde::Serialize;
 
@@ -105,6 +109,7 @@ impl<'p, E> Scope<'p, E> {
 
 pub(crate) struct Progress<'p, I, O, D, E> {
     task: &'p Task<'p, I, O, D, E>,
+    last_update: AtomicOptionInstant,
     current: AtomicU64,
     total: Option<u64>,
     unit: Unit,
@@ -168,9 +173,11 @@ impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
 
 impl<'p, I, O, D, E> Progress<'p, I, O, D, E> {
     fn new(task: &'p Task<'p, I, O, D, E>, total: Option<u64>, unit: Unit) -> Self {
+        let last_update = AtomicOptionInstant::none();
         let current = AtomicU64::new(0);
         let progress = Self {
             task,
+            last_update,
             current,
             total,
             unit,
@@ -181,6 +188,10 @@ impl<'p, I, O, D, E> Progress<'p, I, O, D, E> {
     }
 
     fn publish_update(&self) {
+        if self.throttled() {
+            return;
+        }
+
         let id = self.task.id;
         let current = self.current.load(Ordering::Relaxed);
         let total = self.total;
@@ -192,5 +203,16 @@ impl<'p, I, O, D, E> Progress<'p, I, O, D, E> {
             total,
             unit,
         });
+
+        self.last_update.store(Some(Instant::now()), Ordering::Relaxed);
+    }
+
+    fn throttled(&self) -> bool {
+        const MAX_UPDATE_FREQUENCY_HZ: u64 = 10;
+        const MIN_UPDATE_PERIOD: Duration = Duration::from_millis(1000 / MAX_UPDATE_FREQUENCY_HZ);
+
+        self.last_update
+            .load(Ordering::Relaxed)
+            .is_some_and(|instant| instant.elapsed() < MIN_UPDATE_PERIOD)
     }
 }
