@@ -21,7 +21,7 @@ use derive_more::Display;
 use serde::Serialize;
 
 // Local Crate Imports
-use crate::event::pkg_fetch::PkgFetch;
+use pkg_fetch::PkgFetch;
 
 // Public API ==========================================================================================================
 
