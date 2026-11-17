@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::Path, sync::Mutex, time::Duration};
 use moss::{
     Event,
     event::{
-        self,
+        self, Update,
         pkg_extract::{self, ExtractPackages, PkgExtract},
         pkg_fetch::{self, FetchPackages, PkgFetch},
         task,
@@ -51,9 +51,9 @@ impl Human {
         }
     }
 
-    fn fetch_packages(&self, update: &event::Update<pkg_fetch::PackagesInfo>) {
+    fn fetch_packages(&self, update: &Update<pkg_fetch::PackagesInfo>) {
         match update {
-            event::Update::Started { id, info, .. } => {
+            Update::Started { id, info, .. } => {
                 let progress_bar = self.multi_progress.add(
                     ProgressBar::new(info.count).with_style(
                         ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
@@ -65,17 +65,17 @@ impl Human {
 
                 self.insert(*id, progress_bar, String::new());
             }
-            event::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            event::Update::Completed { id, .. } | event::Update::Aborted { id } => {
+            Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
+            Update::Completed { id, .. } | Update::Aborted { id } => {
                 self.remove(*id);
             }
-            event::Update::Detail { .. } => {}
+            Update::Detail { .. } => {}
         }
     }
 
-    fn fetch_package(&self, update: &event::Update<pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
+    fn fetch_package(&self, update: &Update<pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
         match update {
-            event::Update::Started { id, parent, info } => {
+            Update::Started { id, parent, info } => {
                 let progress_bar = ProgressBar::new(0)
                     .with_message(format!("{} {}", "Downloading".blue(), info.name.as_str().bold()))
                     .with_style(
@@ -93,8 +93,8 @@ impl Human {
 
                 self.insert(*id, progress_bar, info.name.to_string());
             }
-            event::Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            event::Update::Completed { id, output } => {
+            Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
+            Update::Completed { id, output } => {
                 let Some(task_progress) = self.remove(*id) else {
                     return;
                 };
@@ -111,15 +111,15 @@ impl Human {
                     );
                 });
             }
-            event::Update::Aborted { id } => {
+            Update::Aborted { id } => {
                 self.remove(*id);
             }
-            event::Update::Detail { .. } => {}
+            Update::Detail { .. } => {}
         }
     }
 
-    fn extract_packages(&self, update: &event::Update<pkg_extract::PackagesInfo, (), pkg_extract::PackagesDetail>) {
-        if let event::Update::Detail {
+    fn extract_packages(&self, update: &Update<pkg_extract::PackagesInfo, (), pkg_extract::PackagesDetail>) {
+        if let Update::Detail {
             detail: pkg_extract::PackagesDetail::Skipped { path },
             ..
         } = update
@@ -128,8 +128,8 @@ impl Human {
         }
     }
 
-    fn extract_package(&self, update: &event::Update<pkg_extract::PackageInfo>) {
-        if let event::Update::Started { info, .. } = update {
+    fn extract_package(&self, update: &Update<pkg_extract::PackageInfo>) {
+        if let Update::Started { info, .. } = update {
             println!("Extract: {:?} -> {:?}", info.path, info.root);
         }
     }
