@@ -208,6 +208,11 @@ impl Client {
         fetch(self, packages, output_dir, verbose).map_err(|error| Error::Fetch(Box::new(error)))
     }
 
+    /// Perform package extractions
+    pub fn extract(&self, stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
+        extract(stones, output_dir).map_err(|error| Error::Extract(Box::new(error)))
+    }
+
     /// Perform a sync
     pub fn sync(&mut self, yes: bool, simulate: bool) -> Result<sync::Timing, Error> {
         sync(self, yes, simulate).map_err(|error| Error::Sync(Box::new(error)))
@@ -1178,6 +1183,8 @@ pub enum Error {
     Remove(#[source] Box<remove::Error>),
     #[error("fetch")]
     Fetch(#[source] Box<fetch::Error>),
+    #[error("extract")]
+    Extract(#[source] Box<extract::Error>),
     #[error("sync")]
     Sync(#[source] Box<sync::Error>),
     #[error("system model doesn't exist at {0:?}")]
