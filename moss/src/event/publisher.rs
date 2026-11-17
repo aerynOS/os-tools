@@ -11,7 +11,7 @@ pub struct Publisher {
 
 impl Publisher {
     pub fn new() -> Self {
-        let subscribers = Default::default();
+        let subscribers = Vec::new();
         Self { subscribers }
     }
 
