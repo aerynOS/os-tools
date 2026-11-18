@@ -387,8 +387,9 @@ where
                 Ok(0) => break,
                 Ok(_) => {
                     let text = String::from_utf8_lossy(&line);
-                    // Save space and screen real estate by only including the first
-                    // carriage return or newline character encountered in log output
+                    // Save space and screen real estate by only including the first sequence
+                    // of carriage return + newline control characters encountered in build output
+                    // (common line ending for e.g. MS Windows-compatible strings)
                     println!("{tag} {}", text.trim_end_matches(['\r', '\n']));
                 }
                 Err(_) => break,
