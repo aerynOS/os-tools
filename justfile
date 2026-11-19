@@ -36,7 +36,7 @@ get-started: (build "boulder") (build "moss") (licenses)
   cp "{{ root-dir }}/target/{{ build-mode }}"/moss "{{ executable_dir() }}/"
   rm -rf "{{ data_dir() }}/boulder"
   mkdir -p "{{ data_dir() }}/boulder/licenses"
-  cp -R "{{ root-dir }}/boulder/data"/{macros,*.yaml} "{{ data_dir() }}/boulder/"
+  cp -R "{{ root-dir }}/boulder/data"/* "{{ data_dir() }}/boulder/"
   cp "{{ root-dir }}/license-list-data/text"/* "{{ data_dir() }}/boulder/licenses"
   mkdir -p "{{ config_dir() }}/boulder/"
   cp -R "{{ root-dir }}/boulder/data"/profile.d "{{ config_dir() }}/boulder/"
