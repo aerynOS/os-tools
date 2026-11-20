@@ -40,9 +40,9 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
-          echo "CC=/usr/lib/llvm-18/bin/clang" >> $GITHUB_ENV
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+          echo "CC=/usr/lib/llvm-22/bin/clang" >> $GITHUB_ENV
 
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
