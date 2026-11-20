@@ -82,6 +82,20 @@ impl Repository {
         self.query(flags, db::meta::Filter::Keyword(keyword))
     }
 
+    pub fn package_summaries_by_prefix(&self, prefix: &str, flags: package::Flags) -> Vec<package::PackageSummary> {
+        if flags.available || flags == package::Flags::default() {
+            match self.active.db.package_summaries(db::meta::Filter::Prefix(prefix)) {
+                Ok(names) => names,
+                Err(error) => {
+                    warn!("failed to query repository packages: {error}");
+                    vec![]
+                }
+            }
+        } else {
+            vec![]
+        }
+    }
+
     /// Query all packages that match the given provider identity
     pub fn query_provider(&self, provider: &Provider, flags: package::Flags) -> Vec<Package> {
         self.query(flags, db::meta::Filter::Provider(provider.clone()))
