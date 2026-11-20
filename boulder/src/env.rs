@@ -29,9 +29,9 @@ impl Env {
         let config = if let Some(dir) = config_dir {
             config::Manager::custom(dir)
         } else if is_root {
-            config::Manager::system("/", "boulder")
+            config::Manager::system("/", "boulder-devel")
         } else {
-            config::Manager::user("boulder")?
+            config::Manager::user("boulder-devel")?
         };
 
         let cache_dir = resolve_cache_dir(is_root, cache_dir)?;
@@ -55,20 +55,20 @@ fn resolve_cache_dir(is_root: bool, custom: Option<PathBuf>) -> Result<PathBuf, 
     if let Some(dir) = custom {
         Ok(dir)
     } else if is_root {
-        Ok(PathBuf::from("/var/cache/boulder"))
+        Ok(PathBuf::from("/var/cache/boulder-devel"))
     } else {
-        Ok(dirs::cache_dir().ok_or(Error::UserCache)?.join("boulder"))
+        Ok(dirs::cache_dir().ok_or(Error::UserCache)?.join("boulder-devel"))
     }
 }
 
 fn resolve_data_dir(is_root: bool, custom: Option<PathBuf>) -> Result<PathBuf, Error> {
-    let root_dir = PathBuf::from("/usr/share/boulder");
+    let root_dir = PathBuf::from("/usr/share/boulder-devel");
     if let Some(dir) = custom {
         Ok(dir)
     } else if is_root {
         Ok(root_dir)
     } else {
-        let user_datadir = dirs::data_dir().ok_or(Error::UserData)?.join("boulder");
+        let user_datadir = dirs::data_dir().ok_or(Error::UserData)?.join("boulder-devel");
         if user_datadir.exists() && !user_datadir.is_empty() {
             Ok(user_datadir)
         } else {
