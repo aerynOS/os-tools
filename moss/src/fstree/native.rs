@@ -5,7 +5,7 @@ use std::{
     env, io,
     os::fd::{AsRawFd, FromRawFd, RawFd},
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use fs_err as fs;
@@ -21,10 +21,12 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stone::StonePayloadLayoutFile;
 use thiserror::Error;
 use tracing::{debug, info, trace, warn};
-use tui::{ProgressBar, ProgressStyle, Styled};
 use vfs::tree::{BlitFile, Element};
 
-use crate::Installation;
+use crate::{
+    Installation,
+    event::{Sink, task},
+};
 
 use super::PendingFile;
 
@@ -32,7 +34,7 @@ struct BlitContext<'a> {
     is_user_root: bool,
     blit_strategy: BlitStrategy,
     cache_fd: RawFd,
-    progress: &'a ProgressBar,
+    progress: &'a task::Progress<task::Blit>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -173,7 +175,14 @@ fn set_nofile_ulimit_soft_to_hard() {
 ///
 /// This provides a very quick means to generate a hardlinked "snapshot" on-demand,
 /// which can then be activated via [`Self::promote_staging`]
-pub fn blit_root(installation: &Installation, tree: &vfs::Tree<PendingFile>, blit_target: &Path) -> Result<(), Error> {
+///
+/// Progress is reported to `events`
+pub fn blit_root(
+    installation: &Installation,
+    tree: &vfs::Tree<PendingFile>,
+    blit_target: &Path,
+    events: &Sink,
+) -> Result<(), Error> {
     // Up the process nofile soft limit to be equal
     // to the allowed hard limit to minimize the risk
     // of EMFILE during blit
@@ -196,20 +205,11 @@ pub fn blit_root(installation: &Installation, tree: &vfs::Tree<PendingFile>, bli
     let blit_strategy = identify_blit_strategy(installation, blit_target);
     info!(%blit_strategy, "Blit strategy identified");
 
-    let progress = ProgressBar::new(1).with_style(
-        ProgressStyle::with_template("\n|{bar:20.red/blue}| {pos}/{len} {msg}")
-            .unwrap()
-            .progress_chars("■≡=- "),
-    );
-    progress.set_message("Blitting filesystem");
-    progress.enable_steady_tick(Duration::from_millis(150));
-    progress.tick();
+    let blit = events.start_task(task::Blit { total: tree.len() });
+    let progress = blit.start_progress(Some(tree.len()), task::Unit::Items);
 
     let now = Instant::now();
     let mut stats = BlitStats::default();
-
-    progress.set_length(tree.len());
-    progress.set_position(0_u64);
 
     let cache_dir = installation.assets_path("v2");
     let cache_fd = fcntl::open(&cache_dir, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty())?;
@@ -252,17 +252,11 @@ pub fn blit_root(installation: &Installation, tree: &vfs::Tree<PendingFile>, bli
     // Cleanup
     close(ctx.cache_fd)?;
     umask(old_umask);
-    progress.finish_and_clear();
 
-    let elapsed = now.elapsed();
-    let num_entries = stats.num_entries();
-
-    println!(
-        "\n{} entries blitted in {} {}",
-        num_entries.to_string().bold(),
-        format!("{:.2}s", elapsed.as_secs_f32()).bold(),
-        format!("({:.1}k / s)", num_entries as f32 / elapsed.as_secs_f32() / 1_000.0).dim()
-    );
+    blit.complete_task(task::BlittedTree {
+        entries: stats.num_entries(),
+        elapsed: now.elapsed(),
+    });
 
     Ok(())
 }
@@ -280,14 +274,7 @@ fn blit_element(ctx: &BlitContext<'_>, parent: RawFd, element: Element<'_, Pendi
         Element::Child(_, item) => ("file", item),
     };
 
-    trace!(
-        progress = ctx.progress.position() as f32 / ctx.progress.length().unwrap_or(1) as f32,
-        current = ctx.progress.position() as usize,
-        total = ctx.progress.length().unwrap_or(0) as usize,
-        event_type = "progress_update",
-        "Blitting {}",
-        item.path()
-    );
+    trace!("Blitting {}", item.path());
 
     match element {
         Element::Directory(name, item, children) => {
