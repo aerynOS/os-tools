@@ -42,12 +42,12 @@ pub enum Event {
 /// or [`Update::Aborted`] last.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(tag = "update", rename_all = "snake_case")]
-pub enum Update<I = (), O = (), D = ()> {
+pub enum Update<I = Never, O = Never, D = Never> {
     /// The task started, nested under `parent` if it has one
     Started {
         id: task::Id,
         parent: Option<task::Id>,
-        info: I,
+        info: Option<I>,
     },
     /// How far along the task is
     ///
@@ -61,12 +61,16 @@ pub enum Update<I = (), O = (), D = ()> {
     /// A fact found or decided while the task runs
     Detail { id: task::Id, detail: D },
     /// The task finished successfully
-    Completed { id: task::Id, output: O },
+    Completed { id: task::Id, output: Option<O> },
     /// The task stopped before finishing, such as from an error
     Aborted { id: task::Id },
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+
+// TODO: When our MSRV becomes >=1.100, delete this type and replace it with `!`
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
+pub enum Never {}
 
 /// What an [`Update::Progress`] counts
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Serialize)]

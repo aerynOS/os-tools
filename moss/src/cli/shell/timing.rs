@@ -83,7 +83,11 @@ impl Timing {
         let mut tasks = self.tasks.lock().unwrap();
 
         match update {
-            Update::Started { id, parent, info } => {
+            Update::Started {
+                id,
+                parent,
+                info: Some(info),
+            } => {
                 let index = tasks.nodes.len();
                 tasks.nodes.push(Node {
                     id: *id,
