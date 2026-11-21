@@ -59,9 +59,7 @@ pub enum Never {}
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum UpdateKind<S, I, O, D> {
     /// The task started
-    Started {
-        info: Option<I>,
-    },
+    Started(Option<I>),
     /// How far along the task is
     ///
     /// Each update carries the full position, so dropping updates is safe.
@@ -71,18 +69,12 @@ pub enum UpdateKind<S, I, O, D> {
         unit: Unit,
     },
     /// A fact found or decided while the task runs
-    Detail {
-        detail: D,
-    },
+    Detail(D),
     /// The task finished successfully
-    Completed {
-        output: Option<O>,
-    },
+    Completed(Option<O>),
     /// The task stopped before finishing, such as from an error
     Aborted,
-    Subtask {
-        subtask: S,
-    },
+    Subtask(S),
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -32,11 +32,11 @@ impl event::Subscriber for Human {
         // FIXME: This is looking pretty nasty — need to come up with a cleaner way to parse things
         match event {
             Event::PkgFetch(Update {
-                kind: UpdateKind::Subtask { subtask, .. },
+                kind: UpdateKind::Subtask(subtask),
                 ..
             }) => self.pkg_fetch(subtask),
             Event::PkgExtract(Update {
-                kind: UpdateKind::Subtask { subtask, .. },
+                kind: UpdateKind::Subtask(subtask),
                 ..
             }) => self.pkg_extract(subtask),
             // FIXME: Do something about `Update::Started`
@@ -51,9 +51,7 @@ impl Human {
             // FIXME: Unnest this?
             PkgFetch::FetchPackages(Update {
                 id: parent,
-                kind: UpdateKind::Subtask {
-                    subtask: FetchPackage(update),
-                },
+                kind: UpdateKind::Subtask(FetchPackage(update)),
             }) => self.fetch_package(*parent, update),
             PkgFetch::FetchPackages(update) => self.fetch_packages(update),
         }
@@ -62,9 +60,7 @@ impl Human {
     fn pkg_extract(&self, event: &PkgExtract) {
         match event {
             PkgExtract::ExtractPackages(Update {
-                kind: UpdateKind::Subtask {
-                    subtask: ExtractPackage(update),
-                },
+                kind: UpdateKind::Subtask(ExtractPackage(update)),
                 ..
             }) => self.extract_package(update),
             PkgExtract::ExtractPackages(update) => self.extract_packages(update),
@@ -74,7 +70,7 @@ impl Human {
     fn fetch_packages(&self, update: &Update<FetchPackage, pkg_fetch::PackagesInfo>) {
         let id = update.id;
         match &update.kind {
-            UpdateKind::Started { info: Some(info), .. } => {
+            UpdateKind::Started(Some(info)) => {
                 let progress_bar = self.multi_progress.add(
                     ProgressBar::new(info.count).with_style(
                         ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
@@ -87,7 +83,7 @@ impl Human {
                 self.insert(id, progress_bar, String::new());
             }
             UpdateKind::Progress { current, total, .. } => self.progress(id, *current, *total),
-            UpdateKind::Completed { .. } | UpdateKind::Aborted => {
+            UpdateKind::Completed(_) | UpdateKind::Aborted => {
                 self.remove(id);
             }
             _ => {}
@@ -101,7 +97,7 @@ impl Human {
     ) {
         let id = update.id;
         match &update.kind {
-            UpdateKind::Started { info: Some(info) } => {
+            UpdateKind::Started(Some(info)) => {
                 let progress_bar = ProgressBar::new(0)
                     .with_message(format!("{} {}", "Downloading".blue(), info.name.as_str().bold()))
                     .with_style(
@@ -120,7 +116,7 @@ impl Human {
                 self.insert(id, progress_bar, info.name.to_string());
             }
             UpdateKind::Progress { current, total, .. } => self.progress(id, *current, *total),
-            UpdateKind::Completed { output: Some(output) } => {
+            UpdateKind::Completed(Some(output)) => {
                 let Some(task_progress) = self.remove(id) else {
                     return;
                 };
@@ -148,17 +144,13 @@ impl Human {
         &self,
         update: &Update<ExtractPackage, pkg_extract::PackagesInfo, Never, pkg_extract::PackagesDetail>,
     ) {
-        if let UpdateKind::Detail {
-            detail: pkg_extract::PackagesDetail::Skipped { path },
-            ..
-        } = &update.kind
-        {
+        if let UpdateKind::Detail(pkg_extract::PackagesDetail::Skipped { path }) = &update.kind {
             println!("{path:?}: No layout records found, skipping.");
         }
     }
 
     fn extract_package(&self, update: &Update<Never, pkg_extract::PackageInfo>) {
-        if let UpdateKind::Started { info: Some(info), .. } = &update.kind {
+        if let UpdateKind::Started(Some(info)) = &update.kind {
             println!("Extract: {:?} -> {:?}", info.path, info.root);
         }
     }

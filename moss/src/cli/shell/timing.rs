@@ -49,11 +49,11 @@ impl event::Subscriber for Timing {
     fn event(&self, event: &Event) {
         match event {
             Event::PkgFetch(Update {
-                kind: UpdateKind::Subtask { subtask, .. },
+                kind: UpdateKind::Subtask(subtask),
                 ..
             }) => self.pkg_fetch(subtask),
             Event::PkgExtract(Update {
-                kind: UpdateKind::Subtask { subtask, .. },
+                kind: UpdateKind::Subtask(subtask),
                 ..
             }) => self.pkg_extract(subtask),
             // FIXME: Do something about `UpdateKind::Started`
@@ -67,9 +67,7 @@ impl Timing {
         match event {
             PkgFetch::FetchPackages(Update {
                 id: parent,
-                kind: UpdateKind::Subtask {
-                    subtask: FetchPackage(update),
-                },
+                kind: UpdateKind::Subtask(FetchPackage(update)),
             }) => {
                 self.task(Some(*parent), update, "fetch_package", |task| task.name.to_string());
             }
@@ -85,9 +83,7 @@ impl Timing {
         match event {
             PkgExtract::ExtractPackages(Update {
                 id: parent,
-                kind: UpdateKind::Subtask {
-                    subtask: ExtractPackage(update),
-                },
+                kind: UpdateKind::Subtask(ExtractPackage(update)),
             }) => {
                 self.task(Some(*parent), update, "extract_package", |task| {
                     task.path.display().to_string()
@@ -113,7 +109,7 @@ impl Timing {
 
         let id = update.id;
         match &update.kind {
-            UpdateKind::Started { info: Some(info) } => {
+            UpdateKind::Started(Some(info)) => {
                 let index = tasks.nodes.len();
                 tasks.nodes.push(Node {
                     id,
@@ -125,7 +121,7 @@ impl Timing {
                 });
                 tasks.index.insert(id, index);
             }
-            UpdateKind::Completed { .. } => tasks.finish(id, now, End::Completed),
+            UpdateKind::Completed(_) => tasks.finish(id, now, End::Completed),
             UpdateKind::Aborted => tasks.finish(id, now, End::Aborted),
             _ => {}
         }

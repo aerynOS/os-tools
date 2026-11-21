@@ -58,7 +58,7 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
         };
 
         let info = info.into();
-        task.publish_update(UpdateKind::Started { info });
+        task.publish_update(UpdateKind::Started(info));
 
         task
     }
@@ -72,7 +72,7 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
         let publisher = self.publisher;
         let from_update = Box::new(move |st| {
             let subtask = from_update(st);
-            let kind = UpdateKind::Subtask { subtask };
+            let kind = UpdateKind::Subtask(subtask);
             let update = Update { id, kind };
             let parent_from_update = &self.from_update;
 
@@ -88,7 +88,7 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
     }
 
     pub fn report_detail(&self, detail: D) {
-        self.publish_update(UpdateKind::Detail { detail });
+        self.publish_update(UpdateKind::Detail(detail));
     }
 
     /// Report that the task finished successfully
@@ -96,7 +96,7 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
         let output = output.into();
 
         self.finished = true;
-        self.publish_update(UpdateKind::Completed { output });
+        self.publish_update(UpdateKind::Completed(output));
     }
 }
 
