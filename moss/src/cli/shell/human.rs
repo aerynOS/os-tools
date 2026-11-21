@@ -7,8 +7,8 @@ use moss::{
     Event,
     event::{
         self, Never, Update,
-        pkg_extract::{self, ExtractPackages, PkgExtract},
-        pkg_fetch::{self, FetchPackages, PkgFetch},
+        pkg_extract::{self, ExtractPackage, PkgExtract},
+        pkg_fetch::{self, FetchPackage, PkgFetch},
         task,
     },
 };
@@ -39,19 +39,26 @@ impl event::Subscriber for Human {
 impl Human {
     fn pkg_fetch(&self, event: &PkgFetch) {
         match event {
-            PkgFetch::FetchPackagesTask(update) => self.fetch_packages(update),
-            PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update)) => self.fetch_package(update),
+            // FIXME: Unnest this?
+            PkgFetch::FetchPackages(Update::Subtask {
+                subtask: FetchPackage(update),
+                ..
+            }) => self.fetch_package(update),
+            PkgFetch::FetchPackages(update) => self.fetch_packages(update),
         }
     }
 
     fn pkg_extract(&self, event: &PkgExtract) {
         match event {
-            PkgExtract::ExtractPackagesTask(update) => self.extract_packages(update),
-            PkgExtract::ExtractPackages(ExtractPackages::ExtractPackageTask(update)) => self.extract_package(update),
+            PkgExtract::ExtractPackages(Update::Subtask {
+                subtask: ExtractPackage(update),
+                ..
+            }) => self.extract_package(update),
+            PkgExtract::ExtractPackages(update) => self.extract_packages(update),
         }
     }
 
-    fn fetch_packages(&self, update: &Update<pkg_fetch::PackagesInfo>) {
+    fn fetch_packages(&self, update: &Update<FetchPackage, pkg_fetch::PackagesInfo>) {
         match update {
             Update::Started {
                 id, info: Some(info), ..
@@ -75,7 +82,7 @@ impl Human {
         }
     }
 
-    fn fetch_package(&self, update: &Update<pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
+    fn fetch_package(&self, update: &Update<Never, pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
         match update {
             Update::Started {
                 id,
@@ -127,7 +134,10 @@ impl Human {
         }
     }
 
-    fn extract_packages(&self, update: &Update<pkg_extract::PackagesInfo, Never, pkg_extract::PackagesDetail>) {
+    fn extract_packages(
+        &self,
+        update: &Update<ExtractPackage, pkg_extract::PackagesInfo, Never, pkg_extract::PackagesDetail>,
+    ) {
         if let Update::Detail {
             detail: pkg_extract::PackagesDetail::Skipped { path },
             ..
@@ -137,7 +147,7 @@ impl Human {
         }
     }
 
-    fn extract_package(&self, update: &Update<pkg_extract::PackageInfo>) {
+    fn extract_package(&self, update: &Update<Never, pkg_extract::PackageInfo>) {
         if let Update::Started { info: Some(info), .. } = update {
             println!("Extract: {:?} -> {:?}", info.path, info.root);
         }

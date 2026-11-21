@@ -42,7 +42,7 @@ pub enum Event {
 /// or [`Update::Aborted`] last.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(tag = "update", rename_all = "snake_case")]
-pub enum Update<I = Never, O = Never, D = Never> {
+pub enum Update<S = Never, I = Never, O = Never, D = Never> {
     /// The task started, nested under `parent` if it has one
     Started {
         id: task::Id,
@@ -59,11 +59,23 @@ pub enum Update<I = Never, O = Never, D = Never> {
         unit: Unit,
     },
     /// A fact found or decided while the task runs
-    Detail { id: task::Id, detail: D },
+    Detail {
+        id: task::Id,
+        detail: D,
+    },
     /// The task finished successfully
-    Completed { id: task::Id, output: Option<O> },
+    Completed {
+        id: task::Id,
+        output: Option<O>,
+    },
     /// The task stopped before finishing, such as from an error
-    Aborted { id: task::Id },
+    Aborted {
+        id: task::Id,
+    },
+    Subtask {
+        id: task::Id,
+        subtask: S,
+    },
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

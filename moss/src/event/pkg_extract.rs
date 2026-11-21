@@ -12,15 +12,12 @@ use super::Update;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PkgExtract {
-    ExtractPackagesTask(Update<PackagesInfo, Never, PackagesDetail>),
-    ExtractPackages(ExtractPackages),
+    ExtractPackages(Update<ExtractPackage, PackagesInfo, Never, PackagesDetail>),
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ExtractPackages {
-    ExtractPackageTask(Update<PackageInfo>),
-}
+pub struct ExtractPackage(pub Update<Never, PackageInfo>);
 
 /// Extracting a set of package files, with progress counting packages
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]

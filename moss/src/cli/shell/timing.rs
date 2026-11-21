@@ -11,8 +11,8 @@ use moss::{
     Event,
     event::{
         self, Update,
-        pkg_extract::{ExtractPackages, PkgExtract},
-        pkg_fetch::{FetchPackages, PkgFetch},
+        pkg_extract::{ExtractPackage, PkgExtract},
+        pkg_fetch::{FetchPackage, PkgFetch},
         task,
     },
 };
@@ -45,7 +45,6 @@ enum End {
     Aborted,
 }
 
-// FIXME: Unnest these?
 impl event::Subscriber for Timing {
     fn event(&self, event: &Event) {
         match event {
@@ -58,27 +57,33 @@ impl event::Subscriber for Timing {
 impl Timing {
     fn pkg_fetch(&self, event: &PkgFetch) {
         match event {
-            PkgFetch::FetchPackagesTask(update) => {
-                self.task(update, "fetch_packages", |task| format!("{} packages", task.count));
-            }
-            PkgFetch::FetchPackages(FetchPackages::FetchPackageTask(update)) => {
+            PkgFetch::FetchPackages(Update::Subtask {
+                subtask: FetchPackage(update),
+                ..
+            }) => {
                 self.task(update, "fetch_package", |task| task.name.to_string());
+            }
+            PkgFetch::FetchPackages(update) => {
+                self.task(update, "fetch_packages", |task| format!("{} packages", task.count));
             }
         }
     }
 
     fn pkg_extract(&self, event: &PkgExtract) {
         match event {
-            PkgExtract::ExtractPackagesTask(update) => {
-                self.task(update, "extract_packages", |task| format!("{} packages", task.count));
-            }
-            PkgExtract::ExtractPackages(ExtractPackages::ExtractPackageTask(update)) => {
+            PkgExtract::ExtractPackages(Update::Subtask {
+                subtask: ExtractPackage(update),
+                ..
+            }) => {
                 self.task(update, "extract_package", |task| task.path.display().to_string());
+            }
+            PkgExtract::ExtractPackages(update) => {
+                self.task(update, "extract_packages", |task| format!("{} packages", task.count));
             }
         }
     }
 
-    fn task<I, O, D>(&self, update: &Update<I, O, D>, name: &'static str, label: impl FnOnce(&I) -> String) {
+    fn task<S, I, O, D>(&self, update: &Update<S, I, O, D>, name: &'static str, label: impl FnOnce(&I) -> String) {
         let now = Instant::now();
         let mut tasks = self.tasks.lock().unwrap();
 

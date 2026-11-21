@@ -5,20 +5,20 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-use crate::{event::Update, package};
+use crate::{
+    event::{Never, Update},
+    package,
+};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PkgFetch {
-    FetchPackagesTask(Update<PackagesInfo>),
-    FetchPackages(FetchPackages),
+    FetchPackages(Update<FetchPackage, PackagesInfo>),
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FetchPackages {
-    FetchPackageTask(Update<PackageInfo, PackageOutput>),
-}
+pub struct FetchPackage(pub Update<Never, PackageInfo, PackageOutput>);
 
 /// Fetching a set of packages, with progress counting packages
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]

@@ -16,7 +16,7 @@ use crate::{
     client::{self, cache::asset_path},
     event::{
         self,
-        pkg_extract::{self, ExtractPackages, PkgExtract},
+        pkg_extract::{self, PkgExtract},
     },
     fstree, installation,
     package::{self, MissingMetaFieldError},
@@ -35,7 +35,7 @@ pub fn extract(client: &Client, stones: Vec<&PathBuf>, output_dir: &Path) -> Res
 
     let pkg_extract_scope = client.events.root_scope(Event::PkgExtract);
     let extract_packages_task = pkg_extract_scope.start_task(
-        PkgExtract::ExtractPackagesTask,
+        PkgExtract::ExtractPackages,
         pkg_extract::PackagesInfo {
             count: stones.len() as u64,
         },
@@ -66,7 +66,7 @@ pub fn extract(client: &Client, stones: Vec<&PathBuf>, output_dir: &Path) -> Res
 
         let extract_packages_scope = extract_packages_task.child_scope(PkgExtract::ExtractPackages);
         let extract_package = extract_packages_scope.start_task(
-            ExtractPackages::ExtractPackageTask,
+            pkg_extract::ExtractPackage,
             pkg_extract::PackageInfo {
                 path: path.to_owned(),
                 root: extraction_root.clone(),
