@@ -30,39 +30,54 @@ pub struct Id(u64);
 /// Dropping a `Task` without completing it reports [`Update::Aborted`], so a task
 /// left early by `?` is still finished for subscribers.
 #[must_use]
-pub(crate) struct Task<'p, S, I, O, D, E> {
+pub(crate) struct Task<'p, S, I, O, D> {
     id: Id,
     finished: bool,
-    scope: &'p Scope<'p, E>,
+    publisher: &'p Publisher,
     // NOTE: It would be nice to pull out the `Fn(Update<S, I, O, D>) -> E` part — since that also often appears as a
     // parameter throughout this file — but that would require the `trait_alias` feature to be stabilised:
     // https://github.com/rust-lang/rust/issues/41517
     #[expect(clippy::type_complexity)]
-    from_update: Box<dyn Fn(Update<S, I, O, D>) -> E + 'p>,
+    from_update: Box<dyn Fn(Update<S, I, O, D>) -> Event + 'p>,
 }
 
-impl<'p, S, I, O, D, E> Task<'p, S, I, O, D, E> {
-    pub fn child_scope(&'p self, subevent_wrapper: fn(Update<S, I, O, D>) -> E) -> Scope<'p, S> {
-        let parent = Some(self.id);
-        let publisher = self.scope.publisher;
-        let to_event = &self.scope.to_event;
-        let to_event = Box::new(move |se| {
-            to_event(subevent_wrapper(Update::Subtask {
-                id: self.id,
-                subtask: se,
-            }))
-        });
+impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
+    pub fn root(
+        publisher: &'p Publisher,
+        from_update: impl Fn(Update<S, I, O, D>) -> Event + 'p,
+        info: impl Into<Option<I>>,
+    ) -> Self {
+        Self::new(publisher, from_update, None, info)
+    }
 
-        Scope {
-            parent,
-            publisher,
-            to_event,
-        }
+    pub fn start_subtask<S2, I2, O2, D2>(
+        &'p self,
+        from_update: impl Fn(Update<S2, I2, O2, D2>) -> S + 'p,
+        info: impl Into<Option<I2>>,
+    ) -> Task<'p, S2, I2, O2, D2> {
+        let id = self.id;
+        let publisher = self.publisher;
+        let from_update = Box::new(move |st| {
+            let subtask = from_update(st);
+            let update = Update::Subtask { id, subtask };
+            let parent_from_update = &self.from_update;
+
+            parent_from_update(update)
+        });
+        let parent = Some(id);
+
+        Task::new(publisher, from_update, parent, info)
     }
 
     /// Start reporting progress towards `total`, beginning at zero
-    pub fn start_progress(&'p self, total: Option<u64>, unit: Unit) -> Progress<'p, S, I, O, D, E> {
+    pub fn start_progress(&'p self, total: Option<u64>, unit: Unit) -> Progress<'p, S, I, O, D> {
         Progress::new(self, total, unit)
+    }
+
+    pub fn report_detail(&self, detail: D) {
+        let id = self.id;
+
+        self.publish_update(Update::Detail { id, detail });
     }
 
     /// Report that the task finished successfully
@@ -73,15 +88,9 @@ impl<'p, S, I, O, D, E> Task<'p, S, I, O, D, E> {
         self.finished = true;
         self.publish_update(Update::Completed { id, output });
     }
-
-    pub fn report_detail(&self, detail: D) {
-        let id = self.id;
-
-        self.publish_update(Update::Detail { id, detail });
-    }
 }
 
-impl<'p, S, I, O, D, E> Drop for Task<'p, S, I, O, D, E> {
+impl<'p, S, I, O, D> Drop for Task<'p, S, I, O, D> {
     fn drop(&mut self) {
         let id = self.id;
 
@@ -93,45 +102,15 @@ impl<'p, S, I, O, D, E> Drop for Task<'p, S, I, O, D, E> {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-pub(crate) struct Scope<'p, E> {
-    parent: Option<Id>,
-    publisher: &'p Publisher,
-    to_event: Box<dyn Fn(E) -> Event + 'p>,
-}
-
-impl<'p, E> Scope<'p, E> {
-    pub fn root(publisher: &'p Publisher, to_event: fn(E) -> Event) -> Self
-    where
-        E: 'p,
-    {
-        let parent = None;
-        let to_event = Box::new(to_event);
-
-        Self {
-            parent,
-            publisher,
-            to_event,
-        }
-    }
-
-    pub fn start_task<S: 'p, I: 'p, O: 'p, D: 'p>(
-        &'p self,
-        from_update: impl Fn(Update<S, I, O, D>) -> E + 'p,
-        info: I,
-    ) -> Task<'p, S, I, O, D, E> {
-        Task::new(self, from_update, info)
-    }
-}
-
-pub(crate) struct Progress<'p, S, I, O, D, E> {
-    task: &'p Task<'p, S, I, O, D, E>,
+pub(crate) struct Progress<'p, S, I, O, D> {
+    task: &'p Task<'p, S, I, O, D>,
     last_update: AtomicOptionInstant,
     current: AtomicU64,
     total: Option<u64>,
     unit: Unit,
 }
 
-impl<'p, S, I, O, D, E> Progress<'p, S, I, O, D, E> {
+impl<'p, S, I, O, D> Progress<'p, S, I, O, D> {
     pub fn set(&self, current: u64) {
         self.current.store(current, Ordering::Relaxed);
         self.publish_update();
@@ -155,29 +134,23 @@ impl Id {
     }
 }
 
-impl<'p, S, I, O, D, E> Task<'p, S, I, O, D, E> {
+impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
     fn new(
-        scope: &'p Scope<'p, E>,
-        from_update: impl Fn(Update<S, I, O, D>) -> E + 'p,
+        publisher: &'p Publisher,
+        from_update: impl Fn(Update<S, I, O, D>) -> Event + 'p,
+        parent: Option<Id>,
         info: impl Into<Option<I>>,
-    ) -> Self
-    where
-        S: 'p,
-        I: 'p,
-        O: 'p,
-        D: 'p,
-    {
+    ) -> Self {
         let id = Id::new();
         let finished = false;
         let from_update = Box::new(from_update);
         let task = Self {
             id,
             finished,
-            scope,
+            publisher,
             from_update,
         };
 
-        let parent = scope.parent;
         let info = info.into();
         task.publish_update(Update::Started { id, parent, info });
 
@@ -185,16 +158,15 @@ impl<'p, S, I, O, D, E> Task<'p, S, I, O, D, E> {
     }
 
     fn publish_update(&self, update: Update<S, I, O, D>) {
-        let to_event = &self.scope.to_event;
         let from_update = &self.from_update;
-        let event = to_event(from_update(update));
+        let event = from_update(update);
 
-        self.scope.publisher.publish(event);
+        self.publisher.publish(event);
     }
 }
 
-impl<'p, S, I, O, D, E> Progress<'p, S, I, O, D, E> {
-    fn new(task: &'p Task<'p, S, I, O, D, E>, total: Option<u64>, unit: Unit) -> Self {
+impl<'p, S, I, O, D> Progress<'p, S, I, O, D> {
+    fn new(task: &'p Task<'p, S, I, O, D>, total: Option<u64>, unit: Unit) -> Self {
         let last_update = AtomicOptionInstant::none();
         let current = AtomicU64::new(0);
         let progress = Self {

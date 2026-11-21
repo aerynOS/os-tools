@@ -33,8 +33,8 @@ pub fn extract(client: &Client, stones: Vec<&PathBuf>, output_dir: &Path) -> Res
 
     let output_dir = output_dir.canonicalize()?;
 
-    let pkg_extract_scope = client.events.root_scope(Event::PkgExtract);
-    let extract_packages_task = pkg_extract_scope.start_task(
+    let pkg_extract_task = client.events.root_task(Event::PkgExtract, None);
+    let extract_packages_task = pkg_extract_task.start_subtask(
         PkgExtract::ExtractPackages,
         pkg_extract::PackagesInfo {
             count: stones.len() as u64,
@@ -64,8 +64,7 @@ pub fn extract(client: &Client, stones: Vec<&PathBuf>, output_dir: &Path) -> Res
         let pkg_id = package::Id::from(pkg.id());
         let extraction_root = output_dir.join(pkg_id.to_string());
 
-        let extract_packages_scope = extract_packages_task.child_scope(PkgExtract::ExtractPackages);
-        let extract_package = extract_packages_scope.start_task(
+        let extract_package = extract_packages_task.start_subtask(
             pkg_extract::ExtractPackage,
             pkg_extract::PackageInfo {
                 path: path.to_owned(),

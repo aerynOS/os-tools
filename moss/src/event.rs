@@ -32,8 +32,8 @@ use pkg_fetch::PkgFetch;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
-    PkgFetch(PkgFetch),
-    PkgExtract(PkgExtract),
+    PkgFetch(Update<PkgFetch>),
+    PkgExtract(Update<PkgExtract>),
 }
 
 /// A single update about a task

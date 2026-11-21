@@ -55,8 +55,8 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
     instant = Instant::now();
 
-    let pkg_fetch_scope = client.events.root_scope(Event::PkgFetch);
-    let fetch_packages_task = pkg_fetch_scope.start_task(
+    let pkg_fetch_task = client.events.root_task(Event::PkgFetch, None);
+    let fetch_packages_task = pkg_fetch_task.start_subtask(
         PkgFetch::FetchPackages,
         pkg_fetch::PackagesInfo {
             count: total_packages as u64,
@@ -66,8 +66,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
     runtime::block_on(async {
         let stream = stream::iter(&input).map(|pkg| async {
-            let fetch_packages_scope = fetch_packages_task.child_scope(PkgFetch::FetchPackages);
-            let fetch_package_task = fetch_packages_scope.start_task(
+            let fetch_package_task = fetch_packages_task.start_subtask(
                 pkg_fetch::FetchPackage,
                 pkg_fetch::PackageInfo {
                     name: pkg.meta.name.clone(),

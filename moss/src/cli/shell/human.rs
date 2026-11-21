@@ -30,8 +30,10 @@ struct TaskProgress {
 impl event::Subscriber for Human {
     fn event(&self, event: &Event) {
         match event {
-            Event::PkgFetch(subevent) => self.pkg_fetch(subevent),
-            Event::PkgExtract(subevent) => self.pkg_extract(subevent),
+            Event::PkgFetch(Update::Subtask { subtask, .. }) => self.pkg_fetch(subtask),
+            Event::PkgExtract(Update::Subtask { subtask, .. }) => self.pkg_extract(subtask),
+            // FIXME: Do something about `Update::Started`
+            _ => {}
         }
     }
 }

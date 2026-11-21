@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::event::task::Scope;
+use crate::event::{Update, task::Task};
 
 use super::{Event, Subscriber};
 
@@ -25,7 +25,11 @@ impl Publisher {
         }
     }
 
-    pub fn root_scope<'p, E: 'p>(&'p self, to_event: fn(E) -> Event) -> Scope<'p, E> {
-        Scope::root(self, to_event)
+    pub fn root_task<'p, S: 'p, I: 'p, O: 'p, D: 'p>(
+        &'p self,
+        from_update: fn(Update<S, I, O, D>) -> Event,
+        info: impl Into<Option<I>>,
+    ) -> Task<'p, S, I, O, D> {
+        Task::root(self, from_update, info)
     }
 }
