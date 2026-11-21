@@ -36,46 +36,17 @@ pub enum Event {
     PkgExtract(Update<PkgExtract>),
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+
 /// A single update about a task
 ///
-/// A task always sends [`Update::Started`] first and either [`Update::Completed`]
-/// or [`Update::Aborted`] last.
+/// A task always sends [`UpdateKind::Started`] first and either [`UpdateKind::Completed`]
+/// or [`UpdateKind::Aborted`] last.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(tag = "update", rename_all = "snake_case")]
-pub enum Update<S = Never, I = Never, O = Never, D = Never> {
-    /// The task started, nested under `parent` if it has one
-    Started {
-        id: task::Id,
-        parent: Option<task::Id>,
-        info: Option<I>,
-    },
-    /// How far along the task is
-    ///
-    /// Each update carries the full position, so dropping updates is safe.
-    Progress {
-        id: task::Id,
-        current: u64,
-        total: Option<u64>,
-        unit: Unit,
-    },
-    /// A fact found or decided while the task runs
-    Detail {
-        id: task::Id,
-        detail: D,
-    },
-    /// The task finished successfully
-    Completed {
-        id: task::Id,
-        output: Option<O>,
-    },
-    /// The task stopped before finishing, such as from an error
-    Aborted {
-        id: task::Id,
-    },
-    Subtask {
-        id: task::Id,
-        subtask: S,
-    },
+pub struct Update<S = Never, I = Never, O = Never, D = Never> {
+    pub id: task::Id,
+    pub kind: UpdateKind<S, I, O, D>,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -83,6 +54,39 @@ pub enum Update<S = Never, I = Never, O = Never, D = Never> {
 // TODO: When our MSRV becomes >=1.100, delete this type and replace it with `!`
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 pub enum Never {}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum UpdateKind<S, I, O, D> {
+    /// The task started, nested under `parent` if it has one
+    Started {
+        parent: Option<task::Id>,
+        info: Option<I>,
+    },
+    /// How far along the task is
+    ///
+    /// Each update carries the full position, so dropping updates is safe.
+    Progress {
+        current: u64,
+        total: Option<u64>,
+        unit: Unit,
+    },
+    /// A fact found or decided while the task runs
+    Detail {
+        detail: D,
+    },
+    /// The task finished successfully
+    Completed {
+        output: Option<O>,
+    },
+    /// The task stopped before finishing, such as from an error
+    Aborted,
+    Subtask {
+        subtask: S,
+    },
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 
 /// What an [`Update::Progress`] counts
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Serialize)]

@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::Path, sync::Mutex, time::Duration};
 use moss::{
     Event,
     event::{
-        self, Never, Update,
+        self, Never, Update, UpdateKind,
         pkg_extract::{self, ExtractPackage, PkgExtract},
         pkg_fetch::{self, FetchPackage, PkgFetch},
         task,
@@ -29,9 +29,16 @@ struct TaskProgress {
 
 impl event::Subscriber for Human {
     fn event(&self, event: &Event) {
+        // FIXME: This is looking pretty nasty — need to come up with a cleaner way to parse things
         match event {
-            Event::PkgFetch(Update::Subtask { subtask, .. }) => self.pkg_fetch(subtask),
-            Event::PkgExtract(Update::Subtask { subtask, .. }) => self.pkg_extract(subtask),
+            Event::PkgFetch(Update {
+                kind: UpdateKind::Subtask { subtask, .. },
+                ..
+            }) => self.pkg_fetch(subtask),
+            Event::PkgExtract(Update {
+                kind: UpdateKind::Subtask { subtask, .. },
+                ..
+            }) => self.pkg_extract(subtask),
             // FIXME: Do something about `Update::Started`
             _ => {}
         }
@@ -42,8 +49,10 @@ impl Human {
     fn pkg_fetch(&self, event: &PkgFetch) {
         match event {
             // FIXME: Unnest this?
-            PkgFetch::FetchPackages(Update::Subtask {
-                subtask: FetchPackage(update),
+            PkgFetch::FetchPackages(Update {
+                kind: UpdateKind::Subtask {
+                    subtask: FetchPackage(update),
+                },
                 ..
             }) => self.fetch_package(update),
             PkgFetch::FetchPackages(update) => self.fetch_packages(update),
@@ -52,8 +61,10 @@ impl Human {
 
     fn pkg_extract(&self, event: &PkgExtract) {
         match event {
-            PkgExtract::ExtractPackages(Update::Subtask {
-                subtask: ExtractPackage(update),
+            PkgExtract::ExtractPackages(Update {
+                kind: UpdateKind::Subtask {
+                    subtask: ExtractPackage(update),
+                },
                 ..
             }) => self.extract_package(update),
             PkgExtract::ExtractPackages(update) => self.extract_packages(update),
@@ -61,10 +72,9 @@ impl Human {
     }
 
     fn fetch_packages(&self, update: &Update<FetchPackage, pkg_fetch::PackagesInfo>) {
-        match update {
-            Update::Started {
-                id, info: Some(info), ..
-            } => {
+        let id = update.id;
+        match &update.kind {
+            UpdateKind::Started { info: Some(info), .. } => {
                 let progress_bar = self.multi_progress.add(
                     ProgressBar::new(info.count).with_style(
                         ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
@@ -74,20 +84,20 @@ impl Human {
                 );
                 progress_bar.tick();
 
-                self.insert(*id, progress_bar, String::new());
+                self.insert(id, progress_bar, String::new());
             }
-            Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            Update::Completed { id, .. } | Update::Aborted { id } => {
-                self.remove(*id);
+            UpdateKind::Progress { current, total, .. } => self.progress(id, *current, *total),
+            UpdateKind::Completed { .. } | UpdateKind::Aborted => {
+                self.remove(id);
             }
             _ => {}
         }
     }
 
     fn fetch_package(&self, update: &Update<Never, pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
-        match update {
-            Update::Started {
-                id,
+        let id = update.id;
+        match &update.kind {
+            UpdateKind::Started {
                 parent,
                 info: Some(info),
             } => {
@@ -106,14 +116,11 @@ impl Human {
                 };
                 progress_bar.enable_steady_tick(Duration::from_millis(150));
 
-                self.insert(*id, progress_bar, info.name.to_string());
+                self.insert(id, progress_bar, info.name.to_string());
             }
-            Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            Update::Completed {
-                id,
-                output: Some(output),
-            } => {
-                let Some(task_progress) = self.remove(*id) else {
+            UpdateKind::Progress { current, total, .. } => self.progress(id, *current, *total),
+            UpdateKind::Completed { output: Some(output) } => {
+                let Some(task_progress) = self.remove(id) else {
                     return;
                 };
 
@@ -129,8 +136,8 @@ impl Human {
                     );
                 });
             }
-            Update::Aborted { id } => {
-                self.remove(*id);
+            UpdateKind::Aborted => {
+                self.remove(id);
             }
             _ => {}
         }
@@ -140,17 +147,17 @@ impl Human {
         &self,
         update: &Update<ExtractPackage, pkg_extract::PackagesInfo, Never, pkg_extract::PackagesDetail>,
     ) {
-        if let Update::Detail {
+        if let UpdateKind::Detail {
             detail: pkg_extract::PackagesDetail::Skipped { path },
             ..
-        } = update
+        } = &update.kind
         {
             println!("{path:?}: No layout records found, skipping.");
         }
     }
 
     fn extract_package(&self, update: &Update<Never, pkg_extract::PackageInfo>) {
-        if let Update::Started { info: Some(info), .. } = update {
+        if let UpdateKind::Started { info: Some(info), .. } = &update.kind {
             println!("Extract: {:?} -> {:?}", info.path, info.root);
         }
     }

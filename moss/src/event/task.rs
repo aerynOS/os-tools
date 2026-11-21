@@ -15,7 +15,7 @@ use serde::Serialize;
 // Local Crate Imports
 use crate::{
     Event,
-    event::{Publisher, Unit, Update},
+    event::{Publisher, Unit, Update, UpdateKind},
 };
 
 // Public API ==========================================================================================================
@@ -59,7 +59,8 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
         let publisher = self.publisher;
         let from_update = Box::new(move |st| {
             let subtask = from_update(st);
-            let update = Update::Subtask { id, subtask };
+            let kind = UpdateKind::Subtask { subtask };
+            let update = Update { id, kind };
             let parent_from_update = &self.from_update;
 
             parent_from_update(update)
@@ -75,27 +76,22 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
     }
 
     pub fn report_detail(&self, detail: D) {
-        let id = self.id;
-
-        self.publish_update(Update::Detail { id, detail });
+        self.publish_update(UpdateKind::Detail { detail });
     }
 
     /// Report that the task finished successfully
     pub fn complete(mut self, output: impl Into<Option<O>>) {
-        let id = self.id;
         let output = output.into();
 
         self.finished = true;
-        self.publish_update(Update::Completed { id, output });
+        self.publish_update(UpdateKind::Completed { output });
     }
 }
 
 impl<'p, S, I, O, D> Drop for Task<'p, S, I, O, D> {
     fn drop(&mut self) {
-        let id = self.id;
-
         if !self.finished {
-            self.publish_update(Update::Aborted { id });
+            self.publish_update(UpdateKind::Aborted);
         }
     }
 }
@@ -152,12 +148,14 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
         };
 
         let info = info.into();
-        task.publish_update(Update::Started { id, parent, info });
+        task.publish_update(UpdateKind::Started { parent, info });
 
         task
     }
 
-    fn publish_update(&self, update: Update<S, I, O, D>) {
+    fn publish_update(&self, kind: UpdateKind<S, I, O, D>) {
+        let id = self.id;
+        let update = Update { id, kind };
         let from_update = &self.from_update;
         let event = from_update(update);
 
@@ -186,17 +184,11 @@ impl<'p, S, I, O, D> Progress<'p, S, I, O, D> {
             return;
         }
 
-        let id = self.task.id;
         let current = self.current.load(Ordering::Relaxed);
         let total = self.total;
         let unit = self.unit;
 
-        self.task.publish_update(Update::Progress {
-            id,
-            current,
-            total,
-            unit,
-        });
+        self.task.publish_update(UpdateKind::Progress { current, total, unit });
 
         self.last_update.store(Some(Instant::now()), Ordering::Relaxed);
     }

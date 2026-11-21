@@ -10,7 +10,7 @@ use std::{
 use moss::{
     Event,
     event::{
-        self, Update,
+        self, Update, UpdateKind,
         pkg_extract::{ExtractPackage, PkgExtract},
         pkg_fetch::{FetchPackage, PkgFetch},
         task,
@@ -48,9 +48,15 @@ enum End {
 impl event::Subscriber for Timing {
     fn event(&self, event: &Event) {
         match event {
-            Event::PkgFetch(Update::Subtask { subtask, .. }) => self.pkg_fetch(subtask),
-            Event::PkgExtract(Update::Subtask { subtask, .. }) => self.pkg_extract(subtask),
-            // FIXME: Do something about `Update::Started`
+            Event::PkgFetch(Update {
+                kind: UpdateKind::Subtask { subtask, .. },
+                ..
+            }) => self.pkg_fetch(subtask),
+            Event::PkgExtract(Update {
+                kind: UpdateKind::Subtask { subtask, .. },
+                ..
+            }) => self.pkg_extract(subtask),
+            // FIXME: Do something about `UpdateKind::Started`
             _ => {}
         }
     }
@@ -59,8 +65,12 @@ impl event::Subscriber for Timing {
 impl Timing {
     fn pkg_fetch(&self, event: &PkgFetch) {
         match event {
-            PkgFetch::FetchPackages(Update::Subtask {
-                subtask: FetchPackage(update),
+            PkgFetch::FetchPackages(Update {
+                kind:
+                    UpdateKind::Subtask {
+                        subtask: FetchPackage(update),
+                        ..
+                    },
                 ..
             }) => {
                 self.task(update, "fetch_package", |task| task.name.to_string());
@@ -73,8 +83,12 @@ impl Timing {
 
     fn pkg_extract(&self, event: &PkgExtract) {
         match event {
-            PkgExtract::ExtractPackages(Update::Subtask {
-                subtask: ExtractPackage(update),
+            PkgExtract::ExtractPackages(Update {
+                kind:
+                    UpdateKind::Subtask {
+                        subtask: ExtractPackage(update),
+                        ..
+                    },
                 ..
             }) => {
                 self.task(update, "extract_package", |task| task.path.display().to_string());
@@ -89,25 +103,25 @@ impl Timing {
         let now = Instant::now();
         let mut tasks = self.tasks.lock().unwrap();
 
-        match update {
-            Update::Started {
-                id,
+        let id = update.id;
+        match &update.kind {
+            UpdateKind::Started {
                 parent,
                 info: Some(info),
             } => {
                 let index = tasks.nodes.len();
                 tasks.nodes.push(Node {
-                    id: *id,
+                    id,
                     parent: *parent,
                     name,
                     label: label(info),
                     started: now,
                     finished: None,
                 });
-                tasks.index.insert(*id, index);
+                tasks.index.insert(id, index);
             }
-            Update::Completed { id, .. } => tasks.finish(*id, now, End::Completed),
-            Update::Aborted { id } => tasks.finish(*id, now, End::Aborted),
+            UpdateKind::Completed { .. } => tasks.finish(id, now, End::Completed),
+            UpdateKind::Aborted => tasks.finish(id, now, End::Aborted),
             _ => {}
         }
     }
