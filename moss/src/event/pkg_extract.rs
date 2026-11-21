@@ -5,12 +5,14 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
+use crate::event::Never;
+
 use super::Update;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PkgExtract {
-    ExtractPackagesTask(Update<PackagesInfo, (), PackagesDetail>),
+    ExtractPackagesTask(Update<PackagesInfo, Never, PackagesDetail>),
     ExtractPackages(ExtractPackages),
 }
 

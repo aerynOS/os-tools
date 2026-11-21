@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::Path, sync::Mutex, time::Duration};
 use moss::{
     Event,
     event::{
-        self, Update,
+        self, Never, Update,
         pkg_extract::{self, ExtractPackages, PkgExtract},
         pkg_fetch::{self, FetchPackages, PkgFetch},
         task,
@@ -53,7 +53,9 @@ impl Human {
 
     fn fetch_packages(&self, update: &Update<pkg_fetch::PackagesInfo>) {
         match update {
-            Update::Started { id, info, .. } => {
+            Update::Started {
+                id, info: Some(info), ..
+            } => {
                 let progress_bar = self.multi_progress.add(
                     ProgressBar::new(info.count).with_style(
                         ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
@@ -69,13 +71,17 @@ impl Human {
             Update::Completed { id, .. } | Update::Aborted { id } => {
                 self.remove(*id);
             }
-            Update::Detail { .. } => {}
+            _ => {}
         }
     }
 
     fn fetch_package(&self, update: &Update<pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
         match update {
-            Update::Started { id, parent, info } => {
+            Update::Started {
+                id,
+                parent,
+                info: Some(info),
+            } => {
                 let progress_bar = ProgressBar::new(0)
                     .with_message(format!("{} {}", "Downloading".blue(), info.name.as_str().bold()))
                     .with_style(
@@ -94,7 +100,10 @@ impl Human {
                 self.insert(*id, progress_bar, info.name.to_string());
             }
             Update::Progress { id, current, total, .. } => self.progress(*id, *current, *total),
-            Update::Completed { id, output } => {
+            Update::Completed {
+                id,
+                output: Some(output),
+            } => {
                 let Some(task_progress) = self.remove(*id) else {
                     return;
                 };
@@ -114,11 +123,11 @@ impl Human {
             Update::Aborted { id } => {
                 self.remove(*id);
             }
-            Update::Detail { .. } => {}
+            _ => {}
         }
     }
 
-    fn extract_packages(&self, update: &Update<pkg_extract::PackagesInfo, (), pkg_extract::PackagesDetail>) {
+    fn extract_packages(&self, update: &Update<pkg_extract::PackagesInfo, Never, pkg_extract::PackagesDetail>) {
         if let Update::Detail {
             detail: pkg_extract::PackagesDetail::Skipped { path },
             ..
@@ -129,7 +138,7 @@ impl Human {
     }
 
     fn extract_package(&self, update: &Update<pkg_extract::PackageInfo>) {
-        if let Update::Started { info, .. } = update {
+        if let Update::Started { info: Some(info), .. } = update {
             println!("Extract: {:?} -> {:?}", info.path, info.root);
         }
     }

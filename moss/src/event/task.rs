@@ -57,8 +57,9 @@ impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
     }
 
     /// Report that the task finished successfully
-    pub fn complete_task(mut self, output: O) {
+    pub fn complete_task(mut self, output: impl Into<Option<O>>) {
         let id = self.id;
+        let output = output.into();
 
         self.finished = true;
         self.publish_update(Update::Completed { id, output });
@@ -146,7 +147,7 @@ impl Id {
 }
 
 impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
-    fn new(scope: &'p Scope<'p, E>, from_update: fn(Update<I, O, D>) -> E, info: I) -> Self
+    fn new(scope: &'p Scope<'p, E>, from_update: fn(Update<I, O, D>) -> E, info: impl Into<Option<I>>) -> Self
     where
         I: 'p,
         O: 'p,
@@ -163,6 +164,7 @@ impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
         };
 
         let parent = scope.parent;
+        let info = info.into();
         task.publish_update(Update::Started { id, parent, info });
 
         task

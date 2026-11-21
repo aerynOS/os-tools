@@ -141,14 +141,14 @@ pub fn extract(client: &Client, stones: Vec<&PathBuf>, output_dir: &Path) -> Res
 
         fstree::native::blit_root(&installation, &vfs, &extraction_root.canonicalize()?).map_err(Error::BlitFstree)?;
 
-        extract_package.complete_task(());
+        extract_package.complete_task(None);
         progress.increment(1);
     }
 
     // Clean up transient .moss install
     fs::remove_dir_all(installation.root.join(".moss"))?;
 
-    extract_packages_task.complete_task(());
+    extract_packages_task.complete_task(None);
 
     Ok(())
 }

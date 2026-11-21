@@ -104,7 +104,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
         buffered.try_collect::<()>().await
     })?;
 
-    fetch_packages_task.complete_task(());
+    fetch_packages_task.complete_task(None);
 
     timing.fetch = instant.elapsed();
 
