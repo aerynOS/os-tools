@@ -1,0 +1,34 @@
+// SPDX-FileCopyrightText: 2026 aerynOS Developers
+// SPDX-License-Identifier: MPL-2.0
+
+//! Renders [`moss::Event`]s for the shell
+
+use moss::event;
+
+pub use self::human::Human;
+pub use self::json::Json;
+pub use self::timing::Timing;
+
+mod human;
+mod json;
+mod timing;
+
+/// How events are written to stdout
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+pub enum Format {
+    /// Progress bars and messages
+    #[default]
+    Human,
+    /// One json object per line
+    Json,
+}
+
+impl Format {
+    /// The subscriber that receives events in this format
+    pub fn subscriber(self) -> Box<dyn event::Subscriber> {
+        match self {
+            Format::Human => Box::new(Human::default()),
+            Format::Json => Box::new(Json),
+        }
+    }
+}
