@@ -30,6 +30,6 @@ impl Publisher {
         from_update: fn(Update<S, I, O, D>) -> Event,
         info: impl Into<Option<I>>,
     ) -> Task<'p, S, I, O, D> {
-        Task::root(self, from_update, info)
+        Task::new(self, from_update, info)
     }
 }

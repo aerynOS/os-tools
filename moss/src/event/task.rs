@@ -42,12 +42,25 @@ pub(crate) struct Task<'p, S, I, O, D> {
 }
 
 impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
-    pub fn root(
+    pub fn new(
         publisher: &'p Publisher,
         from_update: impl Fn(Update<S, I, O, D>) -> Event + 'p,
         info: impl Into<Option<I>>,
     ) -> Self {
-        Self::new(publisher, from_update, None, info)
+        let id = Id::new();
+        let finished = false;
+        let from_update = Box::new(from_update);
+        let task = Self {
+            id,
+            finished,
+            publisher,
+            from_update,
+        };
+
+        let info = info.into();
+        task.publish_update(UpdateKind::Started { info });
+
+        task
     }
 
     pub fn start_subtask<S2, I2, O2, D2>(
@@ -65,9 +78,8 @@ impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
 
             parent_from_update(update)
         });
-        let parent = Some(id);
 
-        Task::new(publisher, from_update, parent, info)
+        Task::new(publisher, from_update, info)
     }
 
     /// Start reporting progress towards `total`, beginning at zero
@@ -131,28 +143,6 @@ impl Id {
 }
 
 impl<'p, S, I, O, D> Task<'p, S, I, O, D> {
-    fn new(
-        publisher: &'p Publisher,
-        from_update: impl Fn(Update<S, I, O, D>) -> Event + 'p,
-        parent: Option<Id>,
-        info: impl Into<Option<I>>,
-    ) -> Self {
-        let id = Id::new();
-        let finished = false;
-        let from_update = Box::new(from_update);
-        let task = Self {
-            id,
-            finished,
-            publisher,
-            from_update,
-        };
-
-        let info = info.into();
-        task.publish_update(UpdateKind::Started { parent, info });
-
-        task
-    }
-
     fn publish_update(&self, kind: UpdateKind<S, I, O, D>) {
         let id = self.id;
         let update = Update { id, kind };

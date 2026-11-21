@@ -58,9 +58,8 @@ pub enum Never {}
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum UpdateKind<S, I, O, D> {
-    /// The task started, nested under `parent` if it has one
+    /// The task started
     Started {
-        parent: Option<task::Id>,
         info: Option<I>,
     },
     /// How far along the task is

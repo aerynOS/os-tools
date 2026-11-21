@@ -66,17 +66,17 @@ impl Timing {
     fn pkg_fetch(&self, event: &PkgFetch) {
         match event {
             PkgFetch::FetchPackages(Update {
-                kind:
-                    UpdateKind::Subtask {
-                        subtask: FetchPackage(update),
-                        ..
-                    },
-                ..
+                id: parent,
+                kind: UpdateKind::Subtask {
+                    subtask: FetchPackage(update),
+                },
             }) => {
-                self.task(update, "fetch_package", |task| task.name.to_string());
+                self.task(Some(*parent), update, "fetch_package", |task| task.name.to_string());
             }
             PkgFetch::FetchPackages(update) => {
-                self.task(update, "fetch_packages", |task| format!("{} packages", task.count));
+                self.task(None, update, "fetch_packages", |task| {
+                    format!("{} packages", task.count)
+                });
             }
         }
     }
@@ -84,35 +84,40 @@ impl Timing {
     fn pkg_extract(&self, event: &PkgExtract) {
         match event {
             PkgExtract::ExtractPackages(Update {
-                kind:
-                    UpdateKind::Subtask {
-                        subtask: ExtractPackage(update),
-                        ..
-                    },
-                ..
+                id: parent,
+                kind: UpdateKind::Subtask {
+                    subtask: ExtractPackage(update),
+                },
             }) => {
-                self.task(update, "extract_package", |task| task.path.display().to_string());
+                self.task(Some(*parent), update, "extract_package", |task| {
+                    task.path.display().to_string()
+                });
             }
             PkgExtract::ExtractPackages(update) => {
-                self.task(update, "extract_packages", |task| format!("{} packages", task.count));
+                self.task(None, update, "extract_packages", |task| {
+                    format!("{} packages", task.count)
+                });
             }
         }
     }
 
-    fn task<S, I, O, D>(&self, update: &Update<S, I, O, D>, name: &'static str, label: impl FnOnce(&I) -> String) {
+    fn task<S, I, O, D>(
+        &self,
+        parent: Option<task::Id>,
+        update: &Update<S, I, O, D>,
+        name: &'static str,
+        label: impl FnOnce(&I) -> String,
+    ) {
         let now = Instant::now();
         let mut tasks = self.tasks.lock().unwrap();
 
         let id = update.id;
         match &update.kind {
-            UpdateKind::Started {
-                parent,
-                info: Some(info),
-            } => {
+            UpdateKind::Started { info: Some(info) } => {
                 let index = tasks.nodes.len();
                 tasks.nodes.push(Node {
                     id,
-                    parent: *parent,
+                    parent,
                     name,
                     label: label(info),
                     started: now,

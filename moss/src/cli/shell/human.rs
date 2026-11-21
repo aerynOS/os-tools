@@ -50,11 +50,11 @@ impl Human {
         match event {
             // FIXME: Unnest this?
             PkgFetch::FetchPackages(Update {
+                id: parent,
                 kind: UpdateKind::Subtask {
                     subtask: FetchPackage(update),
                 },
-                ..
-            }) => self.fetch_package(update),
+            }) => self.fetch_package(*parent, update),
             PkgFetch::FetchPackages(update) => self.fetch_packages(update),
         }
     }
@@ -94,13 +94,14 @@ impl Human {
         }
     }
 
-    fn fetch_package(&self, update: &Update<Never, pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>) {
+    fn fetch_package(
+        &self,
+        parent: task::Id,
+        update: &Update<Never, pkg_fetch::PackageInfo, pkg_fetch::PackageOutput>,
+    ) {
         let id = update.id;
         match &update.kind {
-            UpdateKind::Started {
-                parent,
-                info: Some(info),
-            } => {
+            UpdateKind::Started { info: Some(info) } => {
                 let progress_bar = ProgressBar::new(0)
                     .with_message(format!("{} {}", "Downloading".blue(), info.name.as_str().bold()))
                     .with_style(
@@ -110,7 +111,7 @@ impl Human {
                         .unwrap()
                         .tick_chars("--=≡■≡=--"),
                     );
-                let progress_bar = match parent.and_then(|parent| self.task_progress(parent)) {
+                let progress_bar = match self.task_progress(parent) {
                     Some(parent) => self.multi_progress.insert_before(&parent.progress_bar, progress_bar),
                     None => self.multi_progress.add(progress_bar),
                 };
