@@ -1,23 +1,28 @@
 // SPDX-FileCopyrightText: 2024 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-use container::Container;
-use thiserror::Error;
+use std::path::PathBuf;
 
 use crate::Paths;
 
-pub fn exec<E>(paths: &Paths, networking: bool, f: impl FnMut() -> Result<(), E>) -> Result<(), Error>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    run(paths, networking, f)
+pub use container::{Container, Error};
+
+pub struct Mapping {
+    pub host: PathBuf,
+    pub guest: PathBuf,
 }
 
-fn run<E>(paths: &Paths, networking: bool, f: impl FnMut() -> Result<(), E>) -> Result<(), Error>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    let rootfs = paths.rootfs().host;
+impl Mapping {
+    /// Applies [std::path::Path::join] to both the host and guest paths of this mapping.
+    pub fn join(&self, path: impl AsRef<std::path::Path>) -> Mapping {
+        Mapping {
+            host: self.host.join(path.as_ref()),
+            guest: self.guest.join(path.as_ref()),
+        }
+    }
+}
+
+pub fn new(paths: &Paths, networking: bool) -> Container {
     let artefacts = paths.artefacts();
     let build = paths.build();
     let compiler = paths.ccache();
@@ -30,7 +35,8 @@ where
     let recipe = paths.recipe();
     let ccache_conf = paths.ccache_config();
 
-    let mut container = Container::new(rootfs)
+    let mut container = Container::new(paths.rootfs().host);
+    container
         .hostname("boulder")
         .networking(networking)
         .ignore_host_sigint(true)
@@ -46,18 +52,16 @@ where
         .bind_rw(&ltocache.host, &ltocache.guest)
         .bind_ro(&recipe.host, &recipe.guest)
         .bind_ro_if_exists(&ccache_conf.host, &ccache_conf.guest);
-
     if let Some(manifest) = paths.verify_manifest() {
-        container = container.bind_ro(&manifest.host, &manifest.guest);
+        container.bind_ro(&manifest.host, &manifest.guest);
     }
-
-    container.run::<E>(f)?;
-
-    Ok(())
+    container
 }
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(transparent)]
-    Container(#[from] container::Error),
+pub fn exec<E>(paths: &Paths, networking: bool, f: impl FnMut() -> Result<(), E>) -> Result<(), Error>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    new(paths, networking).run::<E>(f)?;
+    Ok(())
 }

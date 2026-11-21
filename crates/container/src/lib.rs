@@ -53,15 +53,13 @@ impl Container {
     }
 
     /// Override the working directory
-    pub fn work_dir(self, work_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            work_dir: Some(work_dir.into()),
-            ..self
-        }
+    pub fn work_dir(&mut self, work_dir: impl Into<PathBuf>) -> &mut Self {
+        self.work_dir = Some(work_dir.into());
+        self
     }
 
     /// Create a read-write bind mount
-    pub fn bind_rw(mut self, host: impl Into<PathBuf>, guest: impl Into<PathBuf>) -> Self {
+    pub fn bind_rw(&mut self, host: impl Into<PathBuf>, guest: impl Into<PathBuf>) -> &mut Self {
         self.binds.push(Bind {
             source: host.into(),
             target: guest.into(),
@@ -71,7 +69,7 @@ impl Container {
     }
 
     /// Create a read-only bind mount
-    pub fn bind_ro(mut self, host: impl Into<PathBuf>, guest: impl Into<PathBuf>) -> Self {
+    pub fn bind_ro(&mut self, host: impl Into<PathBuf>, guest: impl Into<PathBuf>) -> &mut Self {
         self.binds.push(Bind {
             source: host.into(),
             target: guest.into(),
@@ -81,7 +79,7 @@ impl Container {
     }
 
     /// Create a read-only bind mount only if the `host` path exists
-    pub fn bind_ro_if_exists(mut self, host: impl Into<PathBuf>, guest: impl Into<PathBuf>) -> Self {
+    pub fn bind_ro_if_exists(&mut self, host: impl Into<PathBuf>, guest: impl Into<PathBuf>) -> &mut Self {
         let source = host.into();
 
         if source.exists() {
@@ -96,32 +94,26 @@ impl Container {
     }
 
     /// Configure networking availability
-    pub fn networking(self, enabled: bool) -> Self {
-        Self {
-            networking: enabled,
-            ..self
-        }
+    pub fn networking(&mut self, enabled: bool) -> &mut Self {
+        self.networking = enabled;
+        self
     }
 
     /// Override hostname (via /etc/hostname)
-    pub fn hostname(self, hostname: impl ToString) -> Self {
-        Self {
-            hostname: Some(hostname.to_string()),
-            ..self
-        }
+    pub fn hostname(&mut self, hostname: impl ToString) -> &mut Self {
+        self.hostname = Some(hostname.to_string());
+        self
     }
 
     /// Ignore `SIGINT` from the parent process. This allows it to be forwarded to a
     /// spawned process inside the container by using [`forward_sigint`].
-    pub fn ignore_host_sigint(self, ignore: bool) -> Self {
-        Self {
-            ignore_host_sigint: ignore,
-            ..self
-        }
+    pub fn ignore_host_sigint(&mut self, ignore: bool) -> &mut Self {
+        self.ignore_host_sigint = ignore;
+        self
     }
 
     /// Run `f` as a container process payload
-    pub fn run<E>(self, mut f: impl FnMut() -> Result<(), E>) -> Result<(), Error>
+    pub fn run<E>(&self, mut f: impl FnMut() -> Result<(), E>) -> Result<(), Error>
     where
         E: std::error::Error + Send + Sync + 'static,
     {
@@ -143,7 +135,7 @@ impl Container {
             flags |= CloneFlags::CLONE_NEWNET;
         }
 
-        let clone_cb = Box::new(|| match enter(&self, sync, &mut f) {
+        let clone_cb = Box::new(|| match enter(self, sync, &mut f) {
             Ok(_) => 0,
             // Write error back to parent process
             Err(error) => {
