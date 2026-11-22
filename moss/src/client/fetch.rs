@@ -92,7 +92,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
                 .await
                 .map_err(|err| Error::FetchPackage(err, pkg.meta.name.clone()))?;
 
-            fetch_package_task.complete_task(pkg_fetch::PackageOutput { path: dest_path });
+            fetch_package_task.complete(pkg_fetch::PackageOutput { path: dest_path });
 
             total_progress.increment(1);
 
@@ -104,7 +104,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
         buffered.try_collect::<()>().await
     })?;
 
-    fetch_packages_task.complete_task(None);
+    fetch_packages_task.complete(None);
 
     timing.fetch = instant.elapsed();
 

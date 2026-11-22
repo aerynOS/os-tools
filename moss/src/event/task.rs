@@ -57,7 +57,7 @@ impl<'p, I, O, D, E> Task<'p, I, O, D, E> {
     }
 
     /// Report that the task finished successfully
-    pub fn complete_task(mut self, output: impl Into<Option<O>>) {
+    pub fn complete(mut self, output: impl Into<Option<O>>) {
         let id = self.id;
         let output = output.into();
 
