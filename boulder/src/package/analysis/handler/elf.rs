@@ -18,11 +18,11 @@ use fs_err::File;
 use path_clean::clean;
 
 use moss::{Dependency, Provider, dependency, util};
-use stone_recipe::tuning::Toolchain;
+use stone_recipe::{bool_or_map::BoolOrMap, tuning::Toolchain};
 
 use crate::package::{
     analysis::{BoxError, BucketMut, Decision, Response},
-    collect::PathInfo,
+    collect::{PathInfo, path_matches},
 };
 
 pub fn elf(bucket: &mut BucketMut<'_>, info: &mut PathInfo) -> Result<Response, BoxError> {
@@ -83,6 +83,12 @@ pub fn elf(bucket: &mut BucketMut<'_>, info: &mut PathInfo) -> Result<Response, 
 fn parse_elf(path: &Path) -> Result<elf::ElfStream<AnyEndian, File>, BoxError> {
     let file = File::open(path)?;
     Ok(elf::ElfStream::open_stream(file)?)
+}
+
+/// Resolve a bool-or-map option against a package target path.
+fn path_enabled(option: &BoolOrMap, path: &Path) -> bool {
+    let path = path.to_string_lossy();
+    option.resolve(true, |pattern| path_matches(pattern, &path))
 }
 
 fn parse_dynamic_section(
@@ -291,7 +297,7 @@ fn split_debug(
     bit_size: Class,
     build_id: &str,
 ) -> Result<Option<PathBuf>, BoxError> {
-    if !bucket.recipe.parsed.options.debug {
+    if !path_enabled(&bucket.recipe.parsed.options.debug, &info.target_path) {
         return Ok(None);
     }
 
@@ -342,7 +348,7 @@ fn split_debug(
 }
 
 fn strip(bucket: &BucketMut<'_>, info: &PathInfo) -> Result<(), BoxError> {
-    if !bucket.recipe.parsed.options.strip {
+    if !path_enabled(&bucket.recipe.parsed.options.strip, &info.target_path) {
         return Ok(());
     }
 

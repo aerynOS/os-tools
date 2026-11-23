@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 pub use serde_yaml::Error;
 
+use crate::bool_or_map::BoolOrMap;
 use crate::serde_util::{default_true, stringy_bool};
 
 pub use self::control_file::ControlFile;
@@ -13,6 +14,7 @@ pub use self::macros::Macros;
 pub use self::tuning::Tuning;
 pub use self::upstream::Upstream;
 
+pub mod bool_or_map;
 pub mod control_file;
 pub mod macros;
 pub mod tuning;
@@ -54,7 +56,7 @@ pub struct Recipe {
     pub mold: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct KeyValue<T> {
     pub key: String,
     pub value: T,
@@ -93,10 +95,10 @@ pub struct Options {
     pub cspgo: bool,
     #[serde(default, deserialize_with = "stringy_bool")]
     pub samplepgo: bool,
-    #[serde(default = "default_true", deserialize_with = "stringy_bool")]
-    pub debug: bool,
-    #[serde(default = "default_true", deserialize_with = "stringy_bool")]
-    pub strip: bool,
+    #[serde(default = "bool_or_map::default_enabled")]
+    pub debug: BoolOrMap,
+    #[serde(default = "bool_or_map::default_enabled")]
+    pub strip: BoolOrMap,
     #[serde(default, deserialize_with = "stringy_bool")]
     pub networking: bool,
     #[serde(default, deserialize_with = "stringy_bool")]
@@ -185,19 +187,18 @@ where
     }
 }
 
-/// Deserialize a sequence of single entry maps as a vec of [`KeyValue`]
+/// Deserialize a single map or a sequence of maps as a vec of [`KeyValue`]
 fn sequence_of_key_value<'de, T, D>(deserializer: D) -> Result<Vec<KeyValue<T>>, D::Error>
 where
     T: Deserialize<'de>,
     D: serde::Deserializer<'de>,
 {
-    let sequence = Vec::<BTreeMap<String, T>>::deserialize(deserializer)?;
+    let entries = single_as_sequence::<BTreeMap<String, T>, D>(deserializer)?;
 
-    Ok(sequence.into_iter().fold(vec![], |acc, next| {
-        acc.into_iter()
-            .chain(next.into_iter().next().map(|(key, value)| KeyValue { key, value }))
-            .collect()
-    }))
+    Ok(entries
+        .into_iter()
+        .flat_map(|entry| entry.into_iter().map(|(key, value)| KeyValue { key, value }))
+        .collect())
 }
 
 fn force_string<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -232,5 +233,89 @@ mod test {
             let recipe = from_slice(input).unwrap();
             dbg!(&recipe);
         }
+    }
+
+    #[test]
+    fn key_value_sequence_or_map() {
+        #[derive(serde::Deserialize)]
+        struct Test {
+            #[serde(deserialize_with = "sequence_of_key_value")]
+            entries: Vec<KeyValue<bool>>,
+        }
+
+        let single: Test = serde_yaml::from_str(
+            "\
+entries:
+  /usr/bin/foo: false
+",
+        )
+        .unwrap();
+        assert_eq!(
+            single.entries,
+            vec![KeyValue {
+                key: "/usr/bin/foo".to_owned(),
+                value: false,
+            }]
+        );
+
+        let sequence: Test = serde_yaml::from_str(
+            "\
+entries:
+  - /usr/bin/foo: false
+  - /usr/bin/bar: true
+",
+        )
+        .unwrap();
+        assert_eq!(
+            sequence.entries,
+            vec![
+                KeyValue {
+                    key: "/usr/bin/foo".to_owned(),
+                    value: false,
+                },
+                KeyValue {
+                    key: "/usr/bin/bar".to_owned(),
+                    value: true,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn options() {
+        let default = "\
+name: test
+version: \"1.0\"
+release: 1
+homepage: https://example.com
+license: MPL-2.0
+";
+        let disabled = "\
+name: test
+version: \"1.0\"
+release: 1
+homepage: https://example.com
+license: MPL-2.0
+strip: false
+";
+        let overridden = "\
+name: test
+version: \"1.0\"
+release: 1
+homepage: https://example.com
+license: MPL-2.0
+strip:
+  - /usr/bin/foo: false
+";
+
+        assert_eq!(from_str(default).unwrap().options.strip, BoolOrMap::All(true));
+        assert_eq!(from_str(disabled).unwrap().options.strip, BoolOrMap::All(false));
+        assert_eq!(
+            from_str(overridden).unwrap().options.strip,
+            BoolOrMap::Map(vec![KeyValue {
+                key: "/usr/bin/foo".to_owned(),
+                value: false,
+            }])
+        );
     }
 }
