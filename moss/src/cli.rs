@@ -368,13 +368,16 @@ fn print_system_model_warning(installation: &Installation, first_line_only: bool
     if !first_line_only {
         eprintln!(
             "Hence:
-- The system-model is the source of truth and defines all
-  repositories & installed packages.
-- Any changes made via `moss` commands will be temporary
-  until the system-model is updated.
-- The system state can be reverted to match the system-model state
+- In model-mode, the system-model file is the source of truth and defines
+  the desired package and repository state of the system.
+- Any changes made via `moss` commands will be temporary until the
+  system-model file is updated.
+- The system state can be reverted to match the system-model file's state
   by doing a `moss sync`.
-- To disable the system-model, remove or rename {path:?}.",
+- To disable this warning, add `disable_warning #true` on a separate line
+  at the top level of {path:?}.
+- To exit model-mode, remove or rename {path:?}.
+  "
         );
     }
 }
