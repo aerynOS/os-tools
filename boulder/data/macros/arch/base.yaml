@@ -247,6 +247,10 @@ tuning              :
     - build-id:
         enabled: build-id
 
+    # Toggle debug-info-for-profiling
+    - sample-profiling:
+        enabled: sample-profiling
+
     # Enable bindnow functionality
     - bindnow:
         enabled: bindnow
@@ -676,6 +680,13 @@ flags               :
     - idae:
         llvm:
             ld    : "-Wl,--ignore-data-address-equality"
+
+    # Enable debug-info-for-profiling (OFF)
+    - sample-profiling:
+        llvm:
+            c     : "-fdebug-info-for-profiling"
+            cxx   : "-fdebug-info-for-profiling"
+            # TODO: Add rust once merged: https://github.com/rust-lang/rust/issues/155668
 
     # Enable LLVM polly optimisations (OFF)
     - polly:
