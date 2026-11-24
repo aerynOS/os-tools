@@ -15,7 +15,7 @@ use url::Url;
 
 use config::Config;
 
-use crate::{db::meta, request};
+use crate::{db::meta, download};
 
 pub use self::format::Format;
 pub use self::handle_outdated::{OutdatedRepoIndexUri, handle_outdated_index_uris};
@@ -188,14 +188,14 @@ impl Config for Map {
 }
 
 async fn fetch_index(url: Url, out_path: impl Into<PathBuf>) -> Result<(), FetchError> {
-    request::download(url, &out_path.into()).await?;
+    download::download(url, &out_path.into()).await?;
     Ok(())
 }
 
 #[derive(Debug, Error)]
 pub enum FetchError {
-    #[error("request")]
-    Request(#[from] request::Error),
+    #[error("download")]
+    Download(#[from] download::Error),
     #[error("io")]
     Io(#[from] io::Error),
 }
@@ -270,7 +270,7 @@ impl RootIndexSource {
     pub async fn fetch_root_index(&self) -> Result<format::RootIndex, ResolveHistoryIndexUriError> {
         let root_index_uri = self.uri();
 
-        request::download_json::<format::RootIndex>(root_index_uri.clone())
+        download::download_json::<format::RootIndex>(root_index_uri.clone())
             .await
             .map_err(|err| ResolveHistoryIndexUriError::FetchRootIndex(err, root_index_uri.clone()))
     }
@@ -278,7 +278,7 @@ impl RootIndexSource {
     pub async fn resolve_history_index_uri(&self) -> Result<ResolvedHistoryIndexUri, ResolveHistoryIndexUriError> {
         let root_index_uri = self.uri();
 
-        let root_index = request::download_json::<format::RootIndex>(root_index_uri.clone())
+        let root_index = download::download_json::<format::RootIndex>(root_index_uri.clone())
             .await
             .map_err(|err| ResolveHistoryIndexUriError::FetchRootIndex(err, root_index_uri.clone()))?;
 
@@ -306,11 +306,11 @@ impl RootIndexSource {
             if let Some((ident, _)) = root_index.upgrade_via_or_latest_history(&Format::LATEST) {
                 warn!(
                     root_index = %root_index_uri,
-                    requested_version = %self.version,
-                    requested_format = %history_meta.format,
+                    downloaded_version = %self.version,
+                    downloaded_format = %history_meta.format,
                     supported_version = %format::ScopedIdentifier::History(ident.clone()),
                     supported_format = %Format::LATEST,
-                    "Requested repo index version is on a newer unsupported format, using latest supported version instead"
+                    "downloaded repo index version is on a newer unsupported format, using latest supported version instead"
                 );
                 return Ok(ResolvedHistoryIndexUri::Supported(self.history_index_uri(ident)));
             }
@@ -337,7 +337,7 @@ impl RootIndexSource {
 #[derive(Debug, Error)]
 pub enum ResolveHistoryIndexUriError {
     #[error("fetch & decode root index file: {1}")]
-    FetchRootIndex(#[source] request::Error, Url),
+    FetchRootIndex(#[source] download::Error, Url),
     #[error("root index doesn't have version identifier {0}")]
     MissingRootIndexVersion(format::ScopedIdentifier),
 }
