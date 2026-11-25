@@ -102,7 +102,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
             let dest_path = output_dir.join(file_name);
 
-            download::download_with_progress(uri, &dest_path, |progress| {
+            download::to_path_with_progress(uri, &dest_path, |progress| {
                 progress_bar.inc(progress.delta);
                 info!(
                     progress = progress.completed as f32 / download_size as f32,

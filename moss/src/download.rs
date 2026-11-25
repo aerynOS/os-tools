@@ -32,14 +32,14 @@ fn get_client() -> &'static reqwest::Client {
 }
 
 /// Downloads a file to the provided path
-pub async fn download(url: Url, to: &Path) -> Result<(), Error> {
+pub async fn to_path(url: Url, to: &Path) -> Result<(), Error> {
     let mut reader = fetch(url).await?;
 
     write_to_file(&mut reader, to).await
 }
 
 /// Downloads the supplied resource as JSON and decodes it into the return type
-pub async fn download_json<T: DeserializeOwned>(url: Url) -> Result<T, Error> {
+pub async fn json<T: DeserializeOwned>(url: Url) -> Result<T, Error> {
     let mut reader = fetch(url).await?;
 
     let mut bytes = vec![];
@@ -50,7 +50,7 @@ pub async fn download_json<T: DeserializeOwned>(url: Url) -> Result<T, Error> {
 }
 
 /// Downloads a file to the provided path & returns it's sha256 hash
-pub async fn download_with_sha256(url: Url, to: &Path) -> Result<String, Error> {
+pub async fn to_path_with_sha256(url: Url, to: &Path) -> Result<String, Error> {
     let mut reader = Sha256Wrapper::new(fetch(url).await?);
 
     write_to_file(&mut reader, to).await?;
@@ -60,7 +60,7 @@ pub async fn download_with_sha256(url: Url, to: &Path) -> Result<String, Error> 
 
 /// Downloads a file to the provided path and invokes `on_progress` after each
 /// chunk is downloaded
-pub async fn download_with_progress(url: Url, to: &Path, on_progress: impl Fn(Progress) + Unpin) -> Result<(), Error> {
+pub async fn to_path_with_progress(url: Url, to: &Path, on_progress: impl Fn(Progress) + Unpin) -> Result<(), Error> {
     let mut reader = ProgressRead::new(fetch(url).await?, on_progress);
 
     write_to_file(&mut reader, to).await
@@ -68,7 +68,7 @@ pub async fn download_with_progress(url: Url, to: &Path, on_progress: impl Fn(Pr
 
 /// Downloads a file to the provided path, invokes `on_progress` after each
 /// chunk is downloaded and returns its sha256 hash
-pub async fn download_with_progress_and_sha256(
+pub async fn to_path_with_progress_and_sha256(
     url: Url,
     to: &Path,
     on_progress: impl Fn(Progress) + Unpin,

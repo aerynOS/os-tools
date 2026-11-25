@@ -127,7 +127,7 @@ pub async fn fetch(
         }
     }
 
-    let actual_hash = download::download_with_progress_and_sha256(url, &destination_path, |progress| {
+    let actual_hash = download::to_path_with_progress_and_sha256(url, &destination_path, |progress| {
         (on_progress)(Progress {
             delta: progress.delta,
             completed: progress.completed,

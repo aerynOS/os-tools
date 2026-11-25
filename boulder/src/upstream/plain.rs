@@ -29,7 +29,7 @@ pub async fn fetch(url: Url, file_path: &Path, pb: &ProgressBar) -> Result<Hash,
     );
     pb.set_message(format!("{} {url}", "Downloading".blue()));
 
-    let hash = download::download_with_progress_and_sha256(url.clone(), file_path, |progress| pb.inc(progress.delta))
+    let hash = download::to_path_with_progress_and_sha256(url.clone(), file_path, |progress| pb.inc(progress.delta))
         .await
         .map_err(Error::from)?
         .try_into()
@@ -258,7 +258,7 @@ pub enum Error {
     HashMismatch { name: String, expected: String, got: Hash },
     #[error("download")]
     /// A local or remote fetch failed.
-    download(#[from] download::Error),
+    Download(#[from] download::Error),
     #[error("io")]
     /// A generic I/O error occurred.
     Io(#[from] io::Error),

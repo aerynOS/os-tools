@@ -479,7 +479,7 @@ async fn fetch_and_cache_upstream(env: &Env, uri: Url, mpb: &MultiProgress) -> R
         .map_err(Error::CreateTempFile)?
         .into_temp_path();
 
-    let hash = download::download_with_progress_and_sha256(uri.clone(), &temp_file_path, |progress| {
+    let hash = download::to_path_with_progress_and_sha256(uri.clone(), &temp_file_path, |progress| {
         pb.inc(progress.delta);
     })
     .await?;

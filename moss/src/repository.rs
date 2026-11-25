@@ -188,7 +188,7 @@ impl Config for Map {
 }
 
 async fn fetch_index(url: Url, out_path: impl Into<PathBuf>) -> Result<(), FetchError> {
-    download::download(url, &out_path.into()).await?;
+    download::to_path(url, &out_path.into()).await?;
     Ok(())
 }
 
@@ -270,7 +270,7 @@ impl RootIndexSource {
     pub async fn fetch_root_index(&self) -> Result<format::RootIndex, ResolveHistoryIndexUriError> {
         let root_index_uri = self.uri();
 
-        download::download_json::<format::RootIndex>(root_index_uri.clone())
+        download::json::<format::RootIndex>(root_index_uri.clone())
             .await
             .map_err(|err| ResolveHistoryIndexUriError::FetchRootIndex(err, root_index_uri.clone()))
     }
@@ -278,7 +278,7 @@ impl RootIndexSource {
     pub async fn resolve_history_index_uri(&self) -> Result<ResolvedHistoryIndexUri, ResolveHistoryIndexUriError> {
         let root_index_uri = self.uri();
 
-        let root_index = download::download_json::<format::RootIndex>(root_index_uri.clone())
+        let root_index = download::json::<format::RootIndex>(root_index_uri.clone())
             .await
             .map_err(|err| ResolveHistoryIndexUriError::FetchRootIndex(err, root_index_uri.clone()))?;
 
