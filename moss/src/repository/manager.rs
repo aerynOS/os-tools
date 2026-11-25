@@ -184,7 +184,7 @@ impl Manager {
             return Err(Error::UnknownRepo(id.clone()));
         };
 
-        if repo.repository.active {
+        if repo.repository.enabled {
             let file = fetch_index(&self.source, &repo, &self.installation).await?;
             runtime::unblock(move || update_meta_db(&repo, &file)).await?;
         }
@@ -199,7 +199,7 @@ impl Manager {
 
         // Fetch index files asynchronously and then
         // update to DB
-        stream::iter(self.repositories.iter().filter(|(_, r)| r.repository.active))
+        stream::iter(self.repositories.iter().filter(|(_, r)| r.repository.enabled))
             .map(|(id, _)| async {
                 let pb = mpb.add(
                     ProgressBar::new_spinner()
@@ -245,7 +245,7 @@ impl Manager {
         let uninitialized = self
             .repositories
             .iter()
-            .filter(|(_, r)| r.repository.active)
+            .filter(|(_, r)| r.repository.enabled)
             .filter_map(|(id, state)| {
                 let index_file =
                     cache_dir(self.source.identifier(), &state.repository, &self.installation).join("stone.index");
@@ -301,9 +301,9 @@ impl Manager {
         Ok(uninitialized.len())
     }
 
-    /// Returns the active repositories held by this manager
-    pub(crate) fn active(&self) -> impl Iterator<Item = repository::Cached> + '_ {
-        self.repositories.values().filter(|c| c.repository.active).cloned()
+    /// Returns the enabled repositories held by this manager
+    pub(crate) fn enabled(&self) -> impl Iterator<Item = repository::Cached> + '_ {
+        self.repositories.values().filter(|c| c.repository.enabled).cloned()
     }
 
     /// Remove a repository, deleting any related config & cached data
@@ -339,8 +339,8 @@ impl Manager {
         self.repositories.iter().map(|(id, state)| (id, &state.repository))
     }
 
-    /// Sets the repo as active or not
-    async fn set_active(&mut self, id: &repository::Id, active: bool) -> Result<(), Error> {
+    /// Sets the repo as enabled or not
+    async fn set_enabled(&mut self, id: &repository::Id, enabled: bool) -> Result<(), Error> {
         // Only allow disable for system repo manager
         let Source::ConfigManager(config) = &*self.source else {
             return Err(Error::ReadOnlySource);
@@ -350,8 +350,8 @@ impl Manager {
             return Err(Error::UnknownRepo(id.clone()));
         };
 
-        if active != cached.repository.active {
-            cached.repository.active = active;
+        if enabled != cached.repository.enabled {
+            cached.repository.enabled = enabled;
 
             let map = repository::Map::with([(id.clone(), cached.repository.clone())]);
             config.save(id, &map).map_err(Error::SaveConfig)?;
@@ -362,12 +362,12 @@ impl Manager {
 
     /// Enable the repo
     pub async fn enable(&mut self, id: &repository::Id) -> Result<(), Error> {
-        self.set_active(id, true).await
+        self.set_enabled(id, true).await
     }
 
     /// Disable the repo
     pub async fn disable(&mut self, id: &repository::Id) -> Result<(), Error> {
-        self.set_active(id, false).await
+        self.set_enabled(id, false).await
     }
 }
 

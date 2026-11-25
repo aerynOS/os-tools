@@ -122,7 +122,7 @@ fn add(mut manager: repository::Manager, args: AddArgs) -> Result<(), Error> {
             description: args.comment,
             source,
             priority: args.priority.into(),
-            active: true,
+            enabled: true,
         },
     )?;
 
@@ -142,7 +142,7 @@ fn list(manager: repository::Manager) -> Result<(), Error> {
     }
 
     for (id, repo) in configured_repos.sorted_by(|(_, a), (_, b)| a.priority.cmp(&b.priority).reverse()) {
-        let disabled = if !repo.active {
+        let disabled = if !repo.enabled {
             " (disabled)".dim().to_string()
         } else {
             String::new()

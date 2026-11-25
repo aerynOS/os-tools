@@ -82,7 +82,7 @@ pub(super) fn push_repository_fields(repo_node: &mut KdlNode, repo: &Repository)
         push_value(priority, i128::from(u64::from(repo.priority)));
     });
 
-    if !repo.active {
+    if !repo.enabled {
         push_child(repo_node, "enabled", |enabled| {
             push_value(enabled, false);
         });
@@ -163,7 +163,7 @@ packages {
                         arch: "aarch64".to_owned(),
                     }),
                     priority: repository::Priority::new(10),
-                    active: true,
+                    enabled: true,
                 },
             ),
             (
@@ -172,7 +172,7 @@ packages {
                     description: "disabled".to_owned(),
                     source: repository::Source::DirectIndex("https://test2.dev/index.stone".parse().unwrap()),
                     priority: repository::Priority::new(2),
-                    active: false,
+                    enabled: false,
                 },
             ),
             (
@@ -186,7 +186,7 @@ packages {
                         arch: repository::DEFAULT_ARCH.to_owned(),
                     }),
                     priority: repository::Priority::new(1),
-                    active: true,
+                    enabled: true,
                 },
             ),
         ]);

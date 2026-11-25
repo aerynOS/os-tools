@@ -112,7 +112,7 @@ fn parse_repository(s: &str) -> Result<(repository::Id, Repository), String> {
             description: String::default(),
             source,
             priority: repository::Priority::new(priority),
-            active: true,
+            enabled: true,
         },
     ))
 }
@@ -141,7 +141,7 @@ pub fn list(manager: profile::Manager<'_>) -> Result<(), Error> {
             .iter()
             .sorted_by(|(_, a), (_, b)| a.priority.cmp(&b.priority).reverse())
         {
-            let disabled = if !repo.active {
+            let disabled = if !repo.enabled {
                 " (disabled)".dim().to_string()
             } else {
                 String::new()

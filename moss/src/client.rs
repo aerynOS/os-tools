@@ -230,7 +230,7 @@ impl Client {
     }
 
     /// Reload all configured repositories and refreshes their index file, then update
-    /// registry with all active repositories.
+    /// registry with all enabled repositories.
     pub async fn refresh_repositories(&mut self) -> Result<(), Error> {
         // Reload manager if config sourced to pickup config changes
         // then refresh indexes
@@ -268,7 +268,7 @@ impl Client {
         Ok(())
     }
 
-    /// Prune all cached data that isn't related to any states or active repositories.
+    /// Prune all cached data that isn't related to any states or enabled repositories.
     ///
     /// This will remove all downloaded stones & unpacked asset data for packages not
     /// in that set.
@@ -833,9 +833,9 @@ impl Client {
         match system_model::load(&path).map_err(Error::LoadSystemModel)? {
             Some(system_model) => Ok(system_model.into()),
             None => {
-                let active_repos = self
+                let enabled_repos = self
                     .repositories
-                    .active()
+                    .enabled()
                     .map(|repo| (repo.id, repo.repository))
                     .collect::<repository::Map>();
 
@@ -845,7 +845,7 @@ impl Client {
                     .map(|package| Provider::package_name(package.meta.name.as_str()))
                     .collect();
 
-                Ok(system_model::create(active_repos, packages))
+                Ok(system_model::create(enabled_repos, packages))
             }
         }
     }
@@ -1031,8 +1031,8 @@ fn update_or_create_system_model(
     repositories: &repository::Manager,
     packages: &[Package],
 ) -> Result<SystemModel, Error> {
-    let active_repos = repositories
-        .active()
+    let enabled_repos = repositories
+        .enabled()
         .map(|repo| (repo.id, repo.repository))
         .collect::<repository::Map>();
 
@@ -1049,7 +1049,7 @@ fn update_or_create_system_model(
                 .map(|package| Provider::package_name(package.meta.name.as_str()))
                 .collect();
 
-            Ok(system_model::create(active_repos, packages))
+            Ok(system_model::create(enabled_repos, packages))
         }
     }
 }
@@ -1102,7 +1102,7 @@ fn build_registry(
     registry.add_plugin(Plugin::Cobble(plugin::Cobble::default()));
     registry.add_plugin(Plugin::Active(plugin::Active::new(state, installdb.clone())));
 
-    for repo in repositories.active() {
+    for repo in repositories.enabled() {
         registry.add_plugin(Plugin::Repository(plugin::Repository::new(repo)));
     }
 

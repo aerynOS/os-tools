@@ -178,7 +178,7 @@ pub(super) fn decode_repository(node: &KdlNode) -> Result<(repository::Id, Repos
             description: description.to_owned(),
             source,
             priority,
-            active: enabled,
+            enabled,
         },
     ))
 }

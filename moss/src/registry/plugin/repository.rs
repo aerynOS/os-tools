@@ -11,22 +11,23 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Repository {
-    active: repository::Cached,
+    repository: repository::Cached,
 }
 
 impl Repository {
-    pub fn new(active: repository::Cached) -> Self {
-        Self { active }
+    pub fn new(repository: repository::Cached) -> Self {
+        Self { repository }
     }
 
+    /// Highest numerical priority "wins"
     pub fn priority(&self) -> u64 {
-        self.active.repository.priority.into()
+        self.repository.repository.priority.into()
     }
 
     pub fn package(&self, id: &package::Id) -> Option<Package> {
-        let index_uri = self.active.index_uri()?;
+        let index_uri = self.repository.index_uri()?;
 
-        let result = self.active.db.get(id);
+        let result = self.repository.db.get(id);
 
         match result {
             Ok(meta) => Some(Package {
@@ -53,7 +54,7 @@ impl Repository {
     fn query(&self, flags: package::Flags, filter: db::meta::Filter<'_>) -> Vec<Package> {
         if flags.available || flags == package::Flags::default() {
             // TODO: Error handling
-            let packages = match self.active.db.query(filter) {
+            let packages = match self.repository.db.query(filter) {
                 Ok(packages) => packages,
                 Err(error) => {
                     warn!("failed to query repository packages: {error}");
@@ -94,7 +95,7 @@ impl Repository {
     pub fn query_provider_id_only(&self, provider: &Provider, flags: package::Flags) -> Vec<package::Id> {
         if flags.available || flags == package::Flags::default() {
             // TODO: Error handling
-            match self.active.db.provider_packages(provider) {
+            match self.repository.db.provider_packages(provider) {
                 Ok(packages) => packages,
                 Err(error) => {
                     warn!("failed to query repository packages: {error}");
@@ -109,7 +110,7 @@ impl Repository {
 
 impl PartialEq for Repository {
     fn eq(&self, other: &Self) -> bool {
-        self.active.id.eq(&other.active.id)
+        self.repository.id.eq(&other.repository.id)
     }
 }
 

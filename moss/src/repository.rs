@@ -56,8 +56,9 @@ pub struct Repository {
     #[serde(flatten)]
     pub source: Source,
     pub priority: Priority,
-    #[serde(default = "default_as_true")]
-    pub active: bool,
+    /// Serialized as `active` for compatibility with existing configs
+    #[serde(rename = "active", default = "default_as_true")]
+    pub enabled: bool,
 }
 
 fn default_as_true() -> bool {
@@ -358,4 +359,23 @@ fn default_channel() -> format::Identifier {
 
 fn default_arch() -> String {
     DEFAULT_ARCH.to_owned()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// `Repository::enabled` respects the `active` key that existing configs use
+    #[test]
+    fn enabled_is_serialized_as_active() {
+        let json = r#"{"description":"test","uri":"https://example.com/stone.index","priority":10,"active":false}"#;
+
+        let repo = serde_json::from_str::<Repository>(json).unwrap();
+        assert!(!repo.enabled);
+        assert!(serde_json::to_string(&repo).unwrap().contains(r#""active":false"#));
+
+        // Removing the active statement leaves the repo enabled as expected
+        let repo = serde_json::from_str::<Repository>(&json.replace(r#","active":false"#, "")).unwrap();
+        assert!(repo.enabled);
+    }
 }
