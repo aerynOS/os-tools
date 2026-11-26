@@ -38,7 +38,7 @@ use self::verify::verify;
 use crate::{
     Installation, Package, Provider, Registry, Signal, State, SystemModel,
     client::fetch::fetch,
-    db, environment, fstree, installation, package,
+    db, environment, event, fstree, installation, package,
     registry::plugin::{self, Plugin},
     repository, runtime, signal,
     state::{self, Selection},
@@ -70,6 +70,7 @@ pub struct ClientBuilder {
     repositories: Option<repository::Map>,
     system_model_path: Option<PathBuf>,
     blit_root: Option<PathBuf>,
+    events: event::Publisher,
 }
 
 impl ClientBuilder {
@@ -82,6 +83,14 @@ impl ClientBuilder {
     /// Set system model path
     pub fn system_model_path(mut self, path: impl Into<PathBuf>) -> ClientBuilder {
         self.system_model_path = Some(path.into());
+        self
+    }
+
+    /// Add a subscriber to receive [`Event`](crate::Event)s about what the client is doing
+    ///
+    /// Without one, events are ignored and the client produces no output.
+    pub fn subscriber(mut self, subscriber: Box<dyn event::Subscriber>) -> ClientBuilder {
+        self.events.subscribe(subscriber);
         self
     }
 
@@ -129,6 +138,7 @@ impl ClientBuilder {
             state_db,
             layout_db,
             scope: Scope::Stateful,
+            events: self.events,
         };
 
         if let Some(blit_root) = self.blit_root {
@@ -156,6 +166,8 @@ pub struct Client {
     repositories: repository::Manager,
     /// Operational scope (real systems, ephemeral, etc)
     scope: Scope,
+    /// Where to report what the client is doing
+    events: event::Publisher,
 }
 
 impl Client {
@@ -167,6 +179,7 @@ impl Client {
             repositories: None,
             system_model_path: None,
             blit_root: None,
+            events: event::Publisher::new(),
         }
     }
 
@@ -193,6 +206,11 @@ impl Client {
     /// Perform package fetches
     pub fn fetch(&mut self, packages: &[&str], output_dir: &Path, verbose: bool) -> Result<fetch::Timing, Error> {
         fetch(self, packages, output_dir, verbose).map_err(|error| Error::Fetch(Box::new(error)))
+    }
+
+    /// Perform package extractions
+    pub fn extract(&self, stones: Vec<&PathBuf>, output_dir: &Path) -> Result<(), Error> {
+        extract(self, stones, output_dir).map_err(|error| Error::Extract(Box::new(error)))
     }
 
     /// Perform a sync
@@ -928,6 +946,7 @@ impl Client {
             state_db,
             layout_db,
             scope: Scope::Stateful,
+            events: event::Publisher::new(),
         })
     }
 }
@@ -1164,6 +1183,8 @@ pub enum Error {
     Remove(#[source] Box<remove::Error>),
     #[error("fetch")]
     Fetch(#[source] Box<fetch::Error>),
+    #[error("extract")]
+    Extract(#[source] Box<extract::Error>),
     #[error("sync")]
     Sync(#[source] Box<sync::Error>),
     #[error("system model doesn't exist at {0:?}")]
