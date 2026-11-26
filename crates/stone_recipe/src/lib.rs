@@ -73,6 +73,7 @@ pub struct Source {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Build {
+    pub prepare: Option<String>,
     pub setup: Option<String>,
     pub build: Option<String>,
     pub install: Option<String>,
@@ -232,5 +233,29 @@ mod test {
             let recipe = from_slice(input).unwrap();
             dbg!(&recipe);
         }
+    }
+
+    #[test]
+    fn deserialize_prepare_phase() {
+        let recipe = from_str(
+            r#"
+name: test
+version: 1
+release: 1
+homepage: https://example.com
+license: MIT
+prepare: patch -i root.patch
+profiles:
+  - native:
+      prepare: patch -i native.patch
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(recipe.build.prepare.as_deref(), Some("patch -i root.patch"));
+        assert_eq!(
+            recipe.profiles[0].value.prepare.as_deref(),
+            Some("patch -i native.patch")
+        );
     }
 }

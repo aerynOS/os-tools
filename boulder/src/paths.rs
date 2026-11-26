@@ -7,6 +7,7 @@ use derive_more::Debug;
 use moss::util;
 
 use crate::Recipe;
+use crate::container::Mapping;
 
 #[derive(Debug, Clone)]
 #[debug("{_0:?}")]
@@ -193,9 +194,4 @@ impl Paths {
                 guest: self.guest_root.join("verify").join(name),
             })
     }
-}
-
-pub struct Mapping {
-    pub host: PathBuf,
-    pub guest: PathBuf,
 }

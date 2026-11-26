@@ -55,6 +55,8 @@ pub struct RecipeModification {
 /// Build field modifications
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct BuildModification {
+    /// Modifies the prepare phase string
+    pub prepare: Option<String>,
     /// Modifies the setup phase string
     pub setup: Option<String>,
     /// Modifies the build phase string
@@ -135,6 +137,7 @@ impl RecipeModification {
 
 impl BuildModification {
     pub fn apply_to_build(self, modification: Modification, build: &mut Build) {
+        modification.update_string(&mut build.prepare, self.prepare);
         modification.update_string(&mut build.setup, self.setup);
         modification.update_string(&mut build.build, self.build);
         modification.update_string(&mut build.install, self.install);
@@ -270,6 +273,7 @@ pub mod decode {
     }
 
     fn decode_build_modification(modification: Modification, node: &KdlNode) -> Result<BuildModification, Error> {
+        let prepare = get_string(modification, node, "prepare")?;
         let setup = get_string(modification, node, "setup")?;
         let build = get_string(modification, node, "build")?;
         let install = get_string(modification, node, "install")?;
@@ -280,6 +284,7 @@ pub mod decode {
         let check_deps = get_string_array(node, "checkdeps");
 
         Ok(BuildModification {
+            prepare,
             setup,
             build,
             install,
@@ -348,6 +353,10 @@ pub mod decode {
                   rundeps {
                       bar
                   }
+                  prepare """
+                    patch
+                    tar
+                    """
                   setup """
                     baz
                     thing
@@ -384,6 +393,7 @@ pub mod decode {
                             RecipeModification {
                                 build: BuildModification {
                                     build_deps: Some(vec!["foo".to_owned()]),
+                                    prepare: Some("patch\ntar".to_owned()),
                                     setup: Some("baz\nthing".to_owned()),
                                     ..Default::default()
                                 },

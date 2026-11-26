@@ -60,7 +60,6 @@ impl Repository {
         run_git(&[
             OsStr::new("clone"),
             OsStr::new("--mirror"),
-            OsStr::new("--recurse-submodules"),
             OsStr::new(&url.as_str()),
             path.as_os_str(),
         ])
@@ -81,7 +80,6 @@ impl Repository {
             &[
                 OsStr::new("clone"),
                 OsStr::new("--mirror"),
-                OsStr::new("--recurse-submodules"),
                 OsStr::new("--progress"),
                 OsStr::new(&url.as_str()),
                 path.as_os_str(),
@@ -152,7 +150,6 @@ impl Repository {
             OsStr::new("-C"),
             self.path.as_os_str(),
             OsStr::new("checkout"),
-            OsStr::new("--recurse-submodules"),
             OsStr::new(rev),
         ])
         .await?;
@@ -171,7 +168,6 @@ impl Repository {
                 OsStr::new("-C"),
                 self.path.as_os_str(),
                 OsStr::new("fetch"),
-                OsStr::new("--recurse-submodules"),
                 OsStr::new("--progress"),
             ],
             callback,
@@ -186,20 +182,50 @@ impl Repository {
         let path = path::absolute(path).map_err(InnerError::from)?;
 
         // Clone it to `path`
-        run_git(&[
-            OsStr::new("clone"),
-            OsStr::new("--recurse-submodules"),
-            self.path.as_os_str(),
-            path.as_os_str(),
-        ])
-        .await?;
+        run_git(&[OsStr::new("clone"), self.path.as_os_str(), path.as_os_str()]).await?;
 
         Ok(Self { path: path.to_owned() })
+    }
+
+    /// Creates a new Git worktree inside `path`, detaching the head to
+    /// `rev`.
+    ///
+    /// A worktree behaves exactly like a regular repository, so a [Repository] is
+    /// returned on success.
+    pub async fn add_worktree(&self, path: &Path, rev: &str) -> Result<Repository, Error> {
+        run_git(&[
+            OsStr::new("-C"),
+            self.path.as_os_str(),
+            OsStr::new("worktree"),
+            OsStr::new("add"),
+            OsStr::new("--force"),          // Ensure left over worktrees won't block the operation.
+            OsStr::new("--detach"),         // Never create a new branch.
+            OsStr::new("--relative-paths"), // Use relative paths to avoid leaking the absolute path of the repo.
+            path.as_os_str(),
+            OsStr::new(rev),
+        ])
+        .await?;
+        Ok(Repository { path: path.to_owned() })
     }
 
     pub fn path(&self) -> &Path {
         &self.path
     }
+}
+
+/// Returns a list of submodules and the expected hashes, if any.
+/// Submodule traversal is performed recursively.
+/// The list is supposed to be human-readable, thus it is a String.
+pub fn print_submodules(path: &Path) -> Result<String, Error> {
+    let output = run_git_sync([
+        OsStr::new("-C"),
+        path.as_os_str(),
+        OsStr::new("submodule"),
+        OsStr::new("status"),
+        OsStr::new("--recursive"),
+        OsStr::new("--cached"), // Print the expected hash, not the current one.
+    ])?;
+    Ok(str::from_utf8(output.stdout.trim_ascii_end()).unwrap_or("").to_owned())
 }
 
 /// The argument of callbacks when they are invoked
@@ -254,6 +280,27 @@ where
         Err(InnerError::Run {
             code: result.code(),
             stderr: None,
+        })?
+    }
+}
+
+/// Runs git and waits for it to terminate.
+fn run_git_sync<I, S>(args: I) -> Result<std::process::Output, Error>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = std::process::Command::new("git")
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(InnerError::from)?;
+    if output.status.success() {
+        Ok(output)
+    } else {
+        Err(InnerError::Run {
+            code: output.status.code(),
+            stderr: Some(String::from_utf8(output.stderr).unwrap()),
         })?
     }
 }

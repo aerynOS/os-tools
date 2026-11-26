@@ -19,16 +19,15 @@
 use std::{
     io,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
-use crate::recipe::Recipe;
-use fs_err as fs;
-use futures_util::{StreamExt, TryStreamExt, stream};
-use moss::runtime;
+use crate::{
+    container::{Container, Mapping},
+    recipe::Recipe,
+};
 use stone_recipe::upstream::{self, SourceUri};
 use thiserror::Error;
-use tui::{MultiProgress, ProgressBar, ProgressStyle, Styled};
+use tui::{ProgressBar, Styled};
 
 use crate::upstream::{
     git::{Git, StoredGit},
@@ -55,15 +54,30 @@ impl Upstream {
     /// in the `upstream` section of a Stone recipe.
     pub fn from_recipe_upstream(upstream: upstream::Upstream, original_index: usize) -> Result<Self, Error> {
         match upstream.props {
-            upstream::Props::Plain { hash, rename, .. } => Ok(Self::Plain(Plain {
+            upstream::Props::Plain {
+                hash,
+                rename,
+                strip_dirs,
+                unpack,
+                unpack_dir,
+            } => Ok(Self::Plain(Plain {
                 url: upstream.url,
                 hash: hash.parse().map_err(plain::Error::from)?,
                 rename,
+                share_mode: if unpack {
+                    plain::ShareMode::Extract {
+                        dir: unpack_dir,
+                        strip_dirs: strip_dirs.unwrap_or(plain::ShareMode::DEFAULT_STRIP_DIRS),
+                    }
+                } else {
+                    plain::ShareMode::Mount
+                },
             })),
-            upstream::Props::Git { git_ref, .. } => Ok(Self::Git(Git {
+            upstream::Props::Git { git_ref, clone_dir } => Ok(Self::Git(Git {
                 url: upstream.url,
                 commit: git_ref,
                 original_index,
+                share_dir: clone_dir,
             })),
         }
     }
@@ -108,7 +122,7 @@ impl Upstream {
     /// Returns the name of the upstream. This is an informal
     /// name used for logging or when a path to be created
     /// doesn't need to be unique.
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
             Upstream::Plain(plain) => plain.name(),
             Upstream::Git(git) => git.name(),
@@ -119,10 +133,26 @@ impl Upstream {
     /// The final path contained in the storage directory, and the write logic,
     /// depend on the upstream variant. The final path where the upstream is stored
     /// is unique inside the storage directory.
-    async fn store(&self, storage_dir: &Path, pb: &ProgressBar) -> Result<Stored, Error> {
+    pub async fn store(&self, storage_dir: &Path, pb: &ProgressBar) -> Result<Stored, Error> {
         Ok(match self {
             Upstream::Plain(plain) => Stored::Plain(plain.store(storage_dir, pb).await?),
             Upstream::Git(git) => Stored::Git(git.store(storage_dir, pb).await?),
+        })
+    }
+
+    pub async fn stored(&self, storage_dir: &Path) -> Result<Stored, Error> {
+        Ok(match self {
+            Upstream::Plain(plain) => Stored::Plain(plain.stored(storage_dir)?),
+            Upstream::Git(git) => {
+                let (repo, has_commit) = git.stored(storage_dir).await?;
+                if !has_commit {
+                    return Err(Error::from(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "repository does not have the required commit",
+                    )));
+                }
+                Stored::Git(repo)
+            }
         })
     }
 
@@ -132,7 +162,7 @@ impl Upstream {
     ///
     /// Careful: this function does not validate the content!
     /// It will be removed even if it does not belong to this Upstream.
-    fn remove(&self, storage_dir: &Path) -> Result<(), Error> {
+    pub fn remove(&self, storage_dir: &Path) -> Result<(), Error> {
         match self {
             Upstream::Plain(plain) => plain.remove(storage_dir).map_err(Error::from),
             Upstream::Git(git) => git.remove(storage_dir).map_err(Error::from),
@@ -147,24 +177,60 @@ pub(crate) enum Stored {
 }
 
 impl Stored {
+    /// Path where the upstream will be shared inside a parent directory.
+    pub fn share_path(&self) -> &Path {
+        match self {
+            Stored::Plain(plain) => match &plain.share_mode {
+                plain::ShareMode::Extract { dir, .. } => dir.as_deref().unwrap_or(Path::new(&plain.name)),
+                plain::ShareMode::Mount => Path::new(&plain.name),
+            },
+            Stored::Git(git) => git.share_dir.as_deref().unwrap_or(Path::new(&git.name)),
+        }
+    }
+
+    /// Name of the upstream, as returned by [Upstream::name].
+    pub fn name(&self) -> &str {
+        match self {
+            Stored::Plain(plain) => &plain.name,
+            Stored::Git(git) => &git.name,
+        }
+    }
+
     /// Whether the upstream did not need to be written at the moment
     /// of being stored, because the constant was already there and valid.
-    fn was_cached(&self) -> bool {
+    pub fn was_cached(&self) -> bool {
         match self {
             Stored::Plain(plain) => plain.was_cached,
             Stored::Git(git) => git.was_cached,
         }
     }
 
-    /// Shares the upstream in preparation of a build.
-    ///
-    /// This function tries to be as efficient as possible in terms
-    /// of actual bytes written/copied, by linking files from the storage directory.
-    async fn share(&self, dest_dir: &Path) -> Result<(), Error> {
+    /// Prepares the builder container's file system to build this Upstream.
+    /// `host_dir` is a directory in the host system that will eventually be shared with the container.
+    pub async fn prepare_fs(&self, host_dir: &Path) -> Result<(), Error> {
         match self {
-            Stored::Plain(plain) => plain.share(dest_dir)?,
-            Stored::Git(git) => git.share(&dest_dir.join(&git.name)).await?,
+            Stored::Plain(plain) => plain.prepare_fs(host_dir).await?,
+            Stored::Git(git) => git.prepare_fs(host_dir).await?,
         }
+        Ok(())
+    }
+
+    /// Configures the builder container to bind-mount the resources required
+    /// to build this Upstream.
+    /// `guest_dir` is the mount point of `host_dir` that was configured with [Self::prepare_fs].
+    pub fn config_mounts(&self, cont: &mut Container, guest_dir: &Path) {
+        match self {
+            Stored::Plain(plain) => plain.config_mounts(cont, guest_dir),
+            Stored::Git(git) => git.config_mounts(cont, guest_dir),
+        }
+    }
+
+    /// Shares the upstream in preparation of a build.
+    /// It is a convenience method for calling [Self::prepare_fs] and [Self::config_mounts]
+    /// all at once.
+    pub async fn share(&self, cont: &mut Container, mapping: Mapping) -> Result<(), Error> {
+        self.prepare_fs(&mapping.host).await?;
+        self.config_mounts(cont, &mapping.guest);
         Ok(())
     }
 }
@@ -179,80 +245,6 @@ pub fn parse_recipe(recipe: &Recipe) -> Result<Vec<Upstream>, Error> {
         .enumerate()
         .map(|(index, upstream)| Upstream::from_recipe_upstream(upstream, index))
         .collect()
-}
-
-/// Helper that stores and shares a list of [Upstream]s.
-pub fn sync(
-    recipe: &Recipe,
-    upstreams: &[Upstream],
-    storage_dir: &Path,
-    share_dir: &Path,
-) -> Result<Vec<Stored>, Error> {
-    println!();
-    println!("Sharing {} upstream(s) with the build container:", upstreams.len());
-
-    let mp = MultiProgress::new();
-    let tp = mp.add(
-        ProgressBar::new(upstreams.len() as u64).with_style(
-            ProgressStyle::with_template("\n|{bar:20.cyan/blue}| {pos}/{len}")
-                .unwrap()
-                .progress_chars("■≡=- "),
-        ),
-    );
-    tp.tick();
-
-    let stored = runtime::block_on(
-        stream::iter(upstreams)
-            .map(|upstream| async {
-                let pb = mp.insert_before(
-                    &tp,
-                    ProgressBar::new(u64::MAX).with_message(format!(
-                        "{} {}",
-                        "Downloading".blue(),
-                        upstream.name().bold(),
-                    )),
-                );
-                pb.enable_steady_tick(Duration::from_millis(150));
-
-                let stored = upstream.store(storage_dir, &pb).await?;
-
-                pb.set_message(format!("{} {}", "Copying".yellow(), upstream.name().bold()));
-                pb.set_style(
-                    ProgressStyle::with_template(" {spinner} {wide_msg} ")
-                        .unwrap()
-                        .tick_chars("--=≡■≡=--"),
-                );
-
-                stored.share(share_dir).await?;
-
-                let cached_tag = stored
-                    .was_cached()
-                    .then_some(format!("{}", " (cached)".dim()))
-                    .unwrap_or_default();
-
-                pb.finish();
-                mp.remove(&pb);
-                mp.suspend(|| println!("{} {}{cached_tag}", "Shared".green(), upstream.name().bold()));
-                tp.inc(1);
-
-                Ok(stored) as Result<_, Error>
-            })
-            .buffer_unordered(moss::environment::MAX_NETWORK_CONCURRENCY)
-            .try_collect::<Vec<_>>(),
-    )?;
-
-    if let Some(updated_yaml) = update_git_upstream_refs(&recipe.source, &stored) {
-        fs::write(&recipe.path, updated_yaml)?;
-        println!(
-            "{} | Git references resolved to commit hashes and saved to stone.yaml. This ensures reproducible builds since tags and branches can move over time.",
-            "Warning".yellow()
-        );
-    }
-
-    mp.clear()?;
-    println!();
-
-    Ok(stored)
 }
 
 /// Helper that removes a list of [Upstream]s from the storage directory.
@@ -366,6 +358,7 @@ upstreams:
                 original_ref: "main".to_owned(),
                 resolved_hash: "1111222233334444555566667777888899990000".to_owned(),
                 original_index: 0,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo2.git".to_owned(),
@@ -375,6 +368,7 @@ upstreams:
                 original_ref: "main".to_owned(),
                 resolved_hash: "aaaa1111bbbb2222cccc3333dddd4444eeee5555".to_owned(),
                 original_index: 1,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo3.git".to_owned(),
@@ -384,6 +378,7 @@ upstreams:
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 resolved_hash: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 original_index: 2,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "repo4.git".to_owned(),
@@ -393,6 +388,7 @@ upstreams:
                 original_ref: "abc123d".to_owned(),
                 resolved_hash: "abc123d567890abcdef1234567890abcdef12345".to_owned(),
                 original_index: 3,
+                share_dir: None,
             }),
             Stored::Git(StoredGit {
                 name: "file.tar.gz".to_owned(),
@@ -403,6 +399,7 @@ upstreams:
                 original_ref: String::new(),
                 resolved_hash: String::new(),
                 original_index: 0,
+                share_dir: None,
             }),
         ];
 
@@ -448,11 +445,13 @@ upstreams:
                 original_ref: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 resolved_hash: "abcd1234567890abcdef1234567890abcdef1234".to_owned(),
                 original_index: 0,
+                share_dir: None,
             }),
             Stored::Plain(StoredPlain {
                 name: "file.tar.gz".to_owned(),
                 path: "/tmp/file.tar.gz".into(),
                 was_cached: false,
+                share_mode: Default::default(),
             }),
         ];
 
