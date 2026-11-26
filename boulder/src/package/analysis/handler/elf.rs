@@ -360,6 +360,10 @@ fn strip(bucket: &BucketMut<'_>, info: &PathInfo) -> Result<(), BoxError> {
 
     let mut command = Command::new(strip);
 
+    // The BB address map is only needed in the split debug file; keeping it in
+    // the runtime ELF inflates libraries by ~8 bytes per basic block.
+    command.arg("--remove-section=.llvm_bb_addr_map");
+
     if is_executable {
         command.arg(&info.path);
     } else {
