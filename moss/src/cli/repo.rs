@@ -32,7 +32,7 @@ impl Command {
             Subcommand::List => list(manager),
             Subcommand::Add(args) => add(manager, args),
             Subcommand::Remove { name } => remove(manager, name),
-            Subcommand::Update { name } => update(manager, name),
+            Subcommand::Refresh { name } => refresh(manager, name),
             Subcommand::Enable { name } => enable(manager, name),
             Subcommand::Disable { name } => disable(manager, name),
         }
@@ -49,7 +49,7 @@ pub enum Error {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    #[command(about = "Add a new repository [aliases: rad]")]
+    #[command(about = "Add a new repository to the system [aliases: rad]")]
     Add(AddArgs),
 
     #[command(about = "List system software repositories [aliases: rls]")]
@@ -58,9 +58,9 @@ enum Subcommand {
     #[command(about = "Remove a repository for the system [aliases: rrm]")]
     Remove { name: String },
 
-    #[command(about = "Update the system repositories [aliases: rup]")]
-    Update {
-        #[arg(help = "Repository to update. If not provided, all will be updated")]
+    #[command(about = "Refresh the cached indices of enabled repositories [aliases: rrf]")]
+    Refresh {
+        #[arg(help = "Repository index to refresh. If not provided, all enabled repository indices will be refreshed")]
         name: Option<String>,
     },
 
@@ -80,7 +80,12 @@ struct AddArgs {
     #[arg(short, long, default_value = "n/a")]
     comment: String,
 
-    #[arg(short, long, help = "Repository priority", default_value_t = 0)]
+    #[arg(
+        short,
+        long,
+        help = "Repository priority (highest numerical value wins)",
+        default_value_t = 0
+    )]
     priority: u64,
 
     // TODO: Completely overhaul this CLI API, this is temporary to add support
@@ -133,7 +138,7 @@ fn add(mut manager: repository::Manager, args: AddArgs) -> Result<(), Error> {
     Ok(())
 }
 
-/// List the repositories and pretty print them
+/// List known repositories and pretty print them
 fn list(manager: repository::Manager) -> Result<(), Error> {
     let configured_repos = manager.list();
     if configured_repos.len() == 0 {
@@ -168,8 +173,8 @@ fn list(manager: repository::Manager) -> Result<(), Error> {
     Ok(())
 }
 
-/// Update specific repos or all
-fn update(manager: repository::Manager, which: Option<String>) -> Result<(), Error> {
+/// Refresh cached view of specific repository index or of all enabled repository indices
+fn refresh(manager: repository::Manager, which: Option<String>) -> Result<(), Error> {
     runtime::block_on(async {
         match which {
             Some(repo) => manager.refresh(&repository::Id::new(&repo)).await,
@@ -180,7 +185,7 @@ fn update(manager: repository::Manager, which: Option<String>) -> Result<(), Err
     Ok(())
 }
 
-/// Remove repo
+/// Remove repository and its cached index from the system
 fn remove(mut manager: repository::Manager, repo: String) -> Result<(), Error> {
     let id = repository::Id::new(&repo);
 
@@ -203,6 +208,7 @@ fn remove(mut manager: repository::Manager, repo: String) -> Result<(), Error> {
     Ok(())
 }
 
+/// Enable resolution of providers from this repository index
 fn enable(mut manager: repository::Manager, repo: String) -> Result<(), Error> {
     let id = repository::Id::new(&repo);
 
@@ -213,6 +219,7 @@ fn enable(mut manager: repository::Manager, repo: String) -> Result<(), Error> {
     Ok(())
 }
 
+/// Disable resolution of providers from this repository index
 fn disable(mut manager: repository::Manager, repo: String) -> Result<(), Error> {
     let id = repository::Id::new(&repo);
 
@@ -230,6 +237,7 @@ struct RootIndexOptions {
     arch: String,
 }
 
+/// The root index contains information about repository streams, tags and versions
 fn parse_root_index_options(s: &str) -> Result<RootIndexOptions, String> {
     if !s.contains('=') {
         return Err("options must be key=value[,key=value]*".to_owned());
