@@ -33,7 +33,7 @@ pub enum Source {
         identifier: String,
         system_model: LoadedSystemModel,
     },
-    Explicit {
+    Supplied {
         identifier: String,
         repos: repository::Map,
     },
@@ -44,7 +44,7 @@ impl Source {
         match self {
             Source::ConfigManager(_) => environment::NAME,
             Source::SystemModel { identifier, .. } => identifier,
-            Source::Explicit { identifier, .. } => identifier,
+            Source::Supplied { identifier, .. } => identifier,
         }
     }
 }
@@ -88,13 +88,13 @@ impl Manager {
     /// Create a [`Manager`] for the supplied [`Installation`] using the provided configurations
     ///
     /// [`Manager`] can't be used to `add` new repos in this mode
-    pub fn with_explicit(
+    pub fn with_supplied(
         identifier: impl ToString,
         repos: repository::Map,
         installation: Installation,
     ) -> Result<Self, Error> {
         Self::new(
-            Source::Explicit {
+            Source::Supplied {
                 identifier: identifier.to_string(),
                 repos,
             },
@@ -114,7 +114,7 @@ impl Manager {
                     .collect()
             }
             Source::SystemModel { system_model, .. } => vec![(None, system_model.repositories.clone())],
-            Source::Explicit { repos, .. } => vec![(None, repos.clone())],
+            Source::Supplied { repos, .. } => vec![(None, repos.clone())],
         };
 
         // Open all repo meta dbs and collect into hash map
@@ -152,7 +152,7 @@ impl Manager {
     /// Add a [`Repository`]
     pub fn add_repository(&mut self, id: repository::Id, repository: Repository) -> Result<(), Error> {
         let Source::ConfigManager(config) = &*self.source else {
-            return Err(Error::ExplicitUnsupported);
+            return Err(Error::ReadOnlySource);
         };
 
         // Save repo as new config file
@@ -310,7 +310,7 @@ impl Manager {
     pub fn remove(&mut self, id: impl Into<repository::Id>) -> Result<Removal, Error> {
         // Only allow removal for system repo manager
         let Source::ConfigManager(config) = &*self.source else {
-            return Err(Error::ExplicitUnsupported);
+            return Err(Error::ReadOnlySource);
         };
 
         // Remove from memory
@@ -343,7 +343,7 @@ impl Manager {
     async fn set_active(&mut self, id: &repository::Id, active: bool) -> Result<(), Error> {
         // Only allow disable for system repo manager
         let Source::ConfigManager(config) = &*self.source else {
-            return Err(Error::ExplicitUnsupported);
+            return Err(Error::ReadOnlySource);
         };
 
         let Some(cached) = self.repositories.get_mut(id) else {
@@ -547,8 +547,8 @@ async fn resolve_index_from_root(
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Can't modify repos when using explicit configs or system-model.kdl")]
-    ExplicitUnsupported,
+    #[error("Can't modify repos when they are supplied directly or by system-model.kdl")]
+    ReadOnlySource,
     #[error("Missing metadata field: {0:?}")]
     MissingMetaField(StonePayloadMetaTag),
     #[error("create directory")]

@@ -134,7 +134,7 @@ pub fn handle_outdated_index_uris(source: &manager::Source, outdated_repos: Vec<
             );
             println!("```");
         }
-        manager::Source::Explicit { .. } => {
+        manager::Source::Supplied { .. } => {
             println!("{count} {repo_plural} {require_plural} a configuration update to the new repository format");
 
             for repo in outdated_repos {

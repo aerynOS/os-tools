@@ -111,7 +111,7 @@ impl ClientBuilder {
         let layout_db = db::layout::Database::new(self.installation.db_path("layout").to_str().unwrap_or_default())?;
 
         let repositories = if let Some(repos) = self.repositories {
-            repository::Manager::with_explicit(&self.client_name, repos, self.installation.clone())?
+            repository::Manager::with_supplied(&self.client_name, repos, self.installation.clone())?
         } else if let Some(system_model) = &self.installation.system_model {
             repository::Manager::with_system_model(&self.client_name, system_model.clone(), self.installation.clone())?
         } else {
