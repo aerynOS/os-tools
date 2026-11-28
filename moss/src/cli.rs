@@ -193,8 +193,8 @@ impl Command {
             self.global.cache_dir.clone(),
         )?;
 
-        if let Some(system_model) = installation.system_model.as_ref() {
-            if !system_model.disable_warning {
+        if let Some(system_model) = installation.declared_model.as_ref() {
+            if !system_model.model().disable_warning {
                 print_system_model_warning(&installation, false);
             } else if self.global.verbose {
                 print_system_model_warning(&installation, true);
@@ -270,7 +270,6 @@ struct Global {
     #[arg(
         short,
         long = "verbose",
-        global = true,
         help = "Prints additional information about what moss is doing",
         help_heading = "Global Options",
         default_value = "false",
@@ -280,7 +279,6 @@ struct Global {
     #[arg(
         short = 'D',
         long = "directory",
-        global = true,
         help = "Root directory",
         help_heading = "Global Options",
         default_value = "/",
@@ -291,7 +289,6 @@ struct Global {
     cache_dir: Option<PathBuf>,
     #[arg(
         long,
-        global = true,
         help = "Logging configuration: <level>[:<format>][:<destination>]\nLevels: trace, debug, info, warn, error\nFormats: text, json\nDestinations: stderr, <file>",
         help_heading = "Global Options",
         global = true

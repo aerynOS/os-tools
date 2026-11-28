@@ -299,12 +299,12 @@ fn export(id: Option<i32>, output: Option<Option<PathBuf>>, installation: Instal
                 None => Path::new(".").join(format_filename()),
             };
 
-            fs::write(&path, system_model.encoded())?;
+            fs::write(&path, system_model.document().encoded())?;
 
             println!("Exported to {path:?}");
         }
         None => {
-            println!("{}", system_model.encoded());
+            println!("{}", system_model.document().encoded());
         }
     }
 

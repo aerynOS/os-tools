@@ -46,12 +46,10 @@ impl Id {
 }
 
 /// Repository configuration data
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Repository {
-    /// Optional description for the repository,
-    /// to aid users.
-    /// When a description is unnecessary, set it
-    /// to the empty string.
+    /// Optional description for the repository, to aid users.
+    /// When a description is unnecessary, set it to the empty string.
     pub description: String,
     #[serde(flatten)]
     pub source: Source,
@@ -65,8 +63,7 @@ fn default_as_true() -> bool {
     true
 }
 
-/// A repository that has been
-/// fetched and cached to a meta database
+/// A repository that has been fetched and cached to a meta database
 #[derive(Debug, Clone)]
 pub struct Cached {
     pub id: Id,
@@ -129,7 +126,7 @@ impl Ord for Priority {
 }
 
 /// A map of repositories
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Map(BTreeMap<Id, Repository>);
 
 impl Map {
@@ -201,7 +198,7 @@ pub enum FetchError {
     Io(#[from] io::Error),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Source {
     #[serde(rename = "uri")]
     DirectIndex(Url),
@@ -219,7 +216,7 @@ impl Source {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RootIndexSource {
     pub base_uri: Url,

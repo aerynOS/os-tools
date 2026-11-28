@@ -8,7 +8,7 @@ use tui::Styled;
 use url::Url;
 
 use crate::{
-    Repository, SystemModel,
+    Repository,
     repository::{self, manager},
 };
 
@@ -114,11 +114,13 @@ pub fn handle_outdated_index_uris(source: &manager::Source, outdated_repos: Vec<
                 })
                 .collect::<repository::Map>();
 
-            let updated_system_model = SystemModel::from(system_model.clone())
-                .update_repositories(&updated_repos)
+            let updated_system_model = system_model
+                .document()
+                .clone()
+                .with_repositories(&updated_repos)
                 .expect("roundtrip system model update");
 
-            let old_kdl = system_model.encoded();
+            let old_kdl = system_model.document().encoded();
             let new_kdl = updated_system_model.encoded();
 
             println!("\nApply the following update to {path:?}");

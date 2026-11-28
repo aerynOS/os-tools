@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
-//! Encapsulation of a target installation filesystem
+//! Encapsulation of a target installation fstree
 
 use std::path::{Path, PathBuf};
 
@@ -11,12 +11,12 @@ use nix::unistd::{AccessFlags, Uid, access};
 use thiserror::Error;
 use tui::Styled;
 
-use crate::{
-    state,
-    system_model::{self, LoadedSystemModel},
-};
+use crate::{state, system_model};
 
 mod lockfile;
+
+/// Path of the declared system model, relative to the installation root
+const DECLARED_MODEL_PATH: &str = "etc/moss/system-model.kdl";
 
 /// System mutability - do we have readwrite?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
@@ -44,8 +44,8 @@ pub struct Installation {
     /// otherwise derived from root
     pub cache_dir: Option<PathBuf>,
 
-    /// If defined, the system model of the installation
-    pub system_model: Option<LoadedSystemModel>,
+    /// If defined, the system model the user declares for the installation
+    pub declared_model: Option<system_model::Declared>,
 
     /// Acquired locks that guarantee exclusive access
     /// to the installation for mutable operations
@@ -102,15 +102,15 @@ impl Installation {
             warn!("Unable to discover Active State ID");
         }
 
-        let system_model =
-            system_model::load(&root.join("etc/moss/system-model.kdl")).map_err(Error::LoadSystemModel)?;
+        let declared_model =
+            system_model::Declared::load(&root.join(DECLARED_MODEL_PATH)).map_err(Error::LoadSystemModel)?;
 
         Ok(Self {
             root,
             mutability,
             active_state,
             cache_dir,
-            system_model,
+            declared_model,
             _locks,
         })
     }
@@ -175,9 +175,19 @@ impl Installation {
         self.root_path("isolation").join(path)
     }
 
-    /// Path to the system model file
+    /// Path to the declared system model
     pub fn system_model_path(&self) -> PathBuf {
-        self.root.join("etc/moss/system-model.kdl")
+        self.root.join(DECLARED_MODEL_PATH)
+    }
+
+    /// The path of the `state`'s fstree: The installation root directory for the active state,
+    /// otherwise its archived root directory
+    pub fn state_root(&self, state: state::Id) -> PathBuf {
+        if self.active_state == Some(state) {
+            self.root.clone()
+        } else {
+            self.root_path(state.to_string())
+        }
     }
 }
 

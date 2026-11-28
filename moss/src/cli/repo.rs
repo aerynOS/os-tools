@@ -21,7 +21,7 @@ impl Command {
     /// Handles the "repo" subcommand.
     pub fn handle(self, installation: Installation) -> Result<(), Error> {
         let config = config::Manager::system(&installation.root, "moss");
-        let system_model = system_model::load(&installation.system_model_path())?;
+        let system_model = system_model::Declared::load(&installation.system_model_path())?;
         let manager = if let Some(system_model) = &system_model {
             repository::Manager::with_system_model(environment::NAME, system_model.clone(), installation.clone())?
         } else {

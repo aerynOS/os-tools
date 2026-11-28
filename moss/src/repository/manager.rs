@@ -22,8 +22,7 @@ use crate::{
     db::meta,
     environment, package,
     repository::{self, Format, OutdatedRepoIndexUri, Repository, format},
-    runtime,
-    system_model::LoadedSystemModel,
+    runtime, system_model,
 };
 
 #[derive(Debug)]
@@ -31,7 +30,7 @@ pub enum Source {
     ConfigManager(config::Manager),
     SystemModel {
         identifier: String,
-        system_model: LoadedSystemModel,
+        system_model: system_model::Declared,
     },
     Supplied {
         identifier: String,
@@ -73,7 +72,7 @@ impl Manager {
     /// [`Manager`] can't be used to `add` new repos in this mode
     pub fn with_system_model(
         identifier: impl ToString,
-        system_model: LoadedSystemModel,
+        system_model: system_model::Declared,
         installation: Installation,
     ) -> Result<Self, Error> {
         Self::new(
@@ -113,7 +112,7 @@ impl Manager {
                     .map(|loaded| (Some(loaded.path), loaded.value))
                     .collect()
             }
-            Source::SystemModel { system_model, .. } => vec![(None, system_model.repositories.clone())],
+            Source::SystemModel { system_model, .. } => vec![(None, system_model.model().repositories.clone())],
             Source::Supplied { repos, .. } => vec![(None, repos.clone())],
         };
 

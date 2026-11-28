@@ -5,6 +5,7 @@ use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
 
 use crate::{Provider, Repository, repository};
 
+/// Encode a [`SystemModel`] into a valid system-model.kdl format KDL document
 pub fn encode<'a>(
     repositories: impl IntoIterator<Item = (&'a repository::Id, &'a Repository)>,
     packages: impl IntoIterator<Item = &'a Provider>,
@@ -30,6 +31,7 @@ fn encode_repositories<'a>(repositories: impl IntoIterator<Item = (&'a repositor
 }
 
 fn encode_packages<'a>(packages: impl IntoIterator<Item = &'a Provider>) -> KdlNode {
+    // TODO: alias "packages" to "providers"
     let mut node = KdlNode::new("packages");
 
     for package in packages {
