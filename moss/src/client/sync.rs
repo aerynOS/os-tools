@@ -252,7 +252,7 @@ fn resolve_with_installed(client: &Client, packages: &[Package]) -> Result<Vec<P
     tx.add(with_sync)?;
 
     // Resolve the tx
-    Ok(client.resolve_packages(tx.finalize())?)
+    Ok(client.packages_by_id(tx.finalize())?)
 }
 
 /// Returns the resolved package set based on the packages defined in the system model
@@ -279,7 +279,7 @@ fn resolve_with_system_model(client: &Client, system_model: &LoadedSystemModel) 
     tx.add(packages)?;
 
     // Resolve the tx
-    Ok(client.resolve_packages(tx.finalize())?)
+    Ok(client.packages_by_id(tx.finalize())?)
 }
 
 /// Simple timing information for Sync

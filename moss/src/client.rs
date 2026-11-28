@@ -288,7 +288,7 @@ impl Client {
     }
 
     /// Resolves the provided id with the underlying registry, returning the first matching [`Package`]
-    pub fn resolve_package(&self, package: &package::Id) -> Result<Package, Error> {
+    pub fn package_by_id(&self, package: &package::Id) -> Result<Package, Error> {
         self.registry
             .by_id(package)
             .next()
@@ -299,7 +299,7 @@ impl Client {
     /// the first [`Package`] for each id.
     ///
     /// Packages are sorted by name and deduped before returning.
-    pub fn resolve_packages<'a>(
+    pub fn packages_by_id<'a>(
         &self,
         packages: impl IntoIterator<Item = &'a package::Id>,
     ) -> Result<Vec<Package>, Error> {
@@ -399,7 +399,7 @@ impl Client {
         );
 
         let explicit_packages =
-            self.resolve_packages(selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?;
+            self.packages_by_id(selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?;
         let system_model = update_or_create_system_model(
             self.installation.system_model.clone(),
             &self.repositories,
@@ -840,7 +840,7 @@ impl Client {
                     .collect::<repository::Map>();
 
                 let packages = self
-                    .resolve_packages(state.selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?
+                    .packages_by_id(state.selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?
                     .into_iter()
                     .map(|package| Provider::package_name(package.meta.name.as_str()))
                     .collect();

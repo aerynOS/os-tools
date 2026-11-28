@@ -373,7 +373,7 @@ fn print_state_selections(state: State, client: &Client) -> Result<(), Error> {
         .selections
         .into_iter()
         .map(|s| {
-            let pkg = client.resolve_package(&s.package)?;
+            let pkg = client.package_by_id(&s.package)?;
 
             Ok(Format {
                 name: pkg.meta.name.to_string(),

@@ -78,7 +78,7 @@ pub fn remove(client: &mut Client, pkgs: &[&str], yes: bool, simulate: bool) -> 
     };
 
     // Resolve all removed packages, where removed is (installed - finalized)
-    let removed = client.resolve_packages(installed_ids.difference(&finalized))?;
+    let removed = client.packages_by_id(installed_ids.difference(&finalized))?;
 
     timing.resolve = instant.elapsed();
     info!(

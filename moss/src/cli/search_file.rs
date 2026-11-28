@@ -42,7 +42,7 @@ impl Command {
             | StonePayloadLayoutFile::Symlink(_, file)
             | StonePayloadLayoutFile::Directory(file) => {
                 if file.contains(&self.keyword)
-                    && let Ok(pkg) = client.resolve_package(&id)
+                    && let Ok(pkg) = client.package_by_id(&id)
                 {
                     let name = pkg.meta.name;
                     println!("{PREFIX}{file} from {}", name.as_str().bold());
