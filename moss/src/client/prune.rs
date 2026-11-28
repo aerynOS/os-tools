@@ -228,7 +228,7 @@ pub(super) fn prune_states(client: &Client, strategy: Strategy<'_>, yes: bool) -
 }
 
 /// Prune all cached data that isn't related to any states
-/// or active repositories. This will remove all downloaded
+/// or enabled repositories. This will remove all downloaded
 /// stones & unpacked asset data for packages not in that set.
 ///
 /// # Arguments
@@ -246,7 +246,7 @@ pub(super) fn prune_cache(
     repositories: &repository::Manager,
 ) -> Result<usize, Error> {
     // Prune all packages from our internal DBs that aren't
-    // part of a state or an active repository
+    // part of a state or an enabled repository
     {
         // Packages in all states (active + archived)
         let state_packages = state_db
@@ -255,9 +255,9 @@ pub(super) fn prune_cache(
             .flat_map(|state| state.selections.into_iter().map(|selection| selection.package))
             .collect::<BTreeSet<_>>();
 
-        // Packages in all active repos
+        // Packages in all enabled repos
         let repo_packages = repositories
-            .active()
+            .enabled()
             .map(|repo| repo.db.package_ids())
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()

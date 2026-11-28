@@ -5,6 +5,7 @@ use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
 
 use crate::{Provider, Repository, repository};
 
+/// Encode a [`SystemModel`] into a valid system-model.kdl format KDL document
 pub fn encode<'a>(
     repositories: impl IntoIterator<Item = (&'a repository::Id, &'a Repository)>,
     packages: impl IntoIterator<Item = &'a Provider>,
@@ -30,6 +31,7 @@ fn encode_repositories<'a>(repositories: impl IntoIterator<Item = (&'a repositor
 }
 
 fn encode_packages<'a>(packages: impl IntoIterator<Item = &'a Provider>) -> KdlNode {
+    // TODO: alias "packages" to "providers"
     let mut node = KdlNode::new("packages");
 
     for package in packages {
@@ -82,7 +84,7 @@ pub(super) fn push_repository_fields(repo_node: &mut KdlNode, repo: &Repository)
         push_value(priority, i128::from(u64::from(repo.priority)));
     });
 
-    if !repo.active {
+    if !repo.enabled {
         push_child(repo_node, "enabled", |enabled| {
             push_value(enabled, false);
         });
@@ -163,7 +165,7 @@ packages {
                         arch: "aarch64".to_owned(),
                     }),
                     priority: repository::Priority::new(10),
-                    active: true,
+                    enabled: true,
                 },
             ),
             (
@@ -172,7 +174,7 @@ packages {
                     description: "disabled".to_owned(),
                     source: repository::Source::DirectIndex("https://test2.dev/index.stone".parse().unwrap()),
                     priority: repository::Priority::new(2),
-                    active: false,
+                    enabled: false,
                 },
             ),
             (
@@ -186,7 +188,7 @@ packages {
                         arch: repository::DEFAULT_ARCH.to_owned(),
                     }),
                     priority: repository::Priority::new(1),
-                    active: true,
+                    enabled: true,
                 },
             ),
         ]);

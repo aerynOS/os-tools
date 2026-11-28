@@ -10,19 +10,21 @@ use super::encode::push_child;
 use crate::system_model::encode::push_repository_fields;
 use crate::{Provider, Repository, repository};
 
-pub fn sync_packages<'a>(
+/// Keep only the explicit providers in `keep`, then append `add`
+pub fn set_explicit<'a>(
     content: &str,
-    packages_to_remove: &BTreeSet<&Provider>,
-    packages_to_add: impl Iterator<Item = &'a str>,
+    keep: &BTreeSet<&Provider>,
+    add: impl Iterator<Item = &'a Provider>,
 ) -> Result<String, decode::Error> {
     let mut document: KdlDocument = content.parse().map_err(decode::Error::ParseKdlDocument)?;
 
-    // If we already have packages defined, remove requested packages
+    // If we already have packages defined, remove those not kept
+    // TODO: Rename this to "providers" (which is the more correct term)
     let packages = if let Some(packages) = document.get_mut("packages") {
         if let Some(children) = packages.children_mut() {
             children.nodes_mut().retain(|child| {
                 if let Ok(package) = decode_package(child) {
-                    !packages_to_remove.contains(&package)
+                    keep.contains(&package)
                 } else {
                     false
                 }
@@ -38,8 +40,8 @@ pub fn sync_packages<'a>(
     };
 
     // Add requested packages
-    for (idx, name) in packages_to_add.enumerate() {
-        push_child(packages, name, |node| {
+    for (idx, provider) in add.enumerate() {
+        push_child(packages, provider.to_name(), |node| {
             // Add whitespace / comment
             if idx == 0 {
                 node.set_format(KdlNodeFormat {
@@ -79,7 +81,7 @@ pub fn update_repositories<'a>(
 
 #[cfg(test)]
 mod test {
-    use crate::{Package, package, system_model};
+    use crate::system_model::Document;
 
     use super::*;
 
@@ -111,11 +113,9 @@ packages {
 // Trailing comment
 ";
 
-        let system_model = system_model::decode(CONTENT).unwrap();
+        let updated = Document::decode(CONTENT).unwrap().with_explicit([]).unwrap();
 
-        let updated = system_model.sync_packages(&[]).unwrap();
-
-        assert_eq!(updated.encoded, EXPECTED);
+        assert_eq!(updated.encoded(), EXPECTED);
     }
 
     #[test]
@@ -140,22 +140,20 @@ packages {
 // Trailing comment
 "#;
 
-        let system_model = system_model::decode(CONTENT).unwrap();
-
-        let updated = system_model
-            .sync_packages(&[
-                // Original
-                package("a"),
-                package("b"),
-                package("delete-me"),
-                package(r#"soname(foo.so)"#),
+        let updated = Document::decode(CONTENT)
+            .unwrap()
+            .with_explicit(&[
+                provider("a"),
+                provider("b"),
+                provider("delete-me"),
+                provider(r#"soname(foo.so)"#),
                 // Added
-                package("c"),
-                package(r#"soname(asdf.so)"#),
+                provider("c"),
+                provider(r#"soname(asdf.so)"#),
             ])
             .unwrap();
 
-        assert_eq!(updated.encoded, EXPECTED);
+        assert_eq!(updated.encoded(), EXPECTED);
     }
 
     #[test]
@@ -179,45 +177,23 @@ packages {
 // Trailing comment
 "#;
 
-        let system_model = system_model::decode(CONTENT).unwrap();
-
-        let updated = system_model
-            .sync_packages(&[
+        let updated = Document::decode(CONTENT)
+            .unwrap()
+            .with_explicit(&[
                 // Original
-                package("a"),
-                package("b"),
-                package(r#"soname(foo.so)"#),
+                provider("a"),
+                provider("b"),
+                provider(r#"soname(foo.so)"#),
                 // Added
-                package("c"),
-                package(r#"soname(asdf.so)"#),
+                provider("c"),
+                provider(r#"soname(asdf.so)"#),
             ])
             .unwrap();
 
-        assert_eq!(updated.encoded, EXPECTED);
+        assert_eq!(updated.encoded(), EXPECTED);
     }
 
-    fn package(name: &'static str) -> Package {
-        Package {
-            id: package::Id::from(name),
-            meta: package::Meta {
-                name: name.to_owned().into(),
-                version_identifier: "".to_owned(),
-                source_release: 0,
-                build_release: 0,
-                architecture: "".to_owned(),
-                summary: "".to_owned(),
-                description: "".to_owned(),
-                source_id: "".to_owned(),
-                homepage: "".to_owned(),
-                licenses: vec![],
-                dependencies: Default::default(),
-                providers: [Provider::from_name(name).unwrap()].into_iter().collect(),
-                conflicts: Default::default(),
-                uri: None,
-                hash: None,
-                download_size: None,
-            },
-            flags: package::Flags::default(),
-        }
+    fn provider(name: &'static str) -> Provider {
+        Provider::from_name(name).unwrap()
     }
 }

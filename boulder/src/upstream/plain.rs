@@ -9,7 +9,7 @@ use std::{
 };
 
 use fs_err as fs;
-use moss::{request, util};
+use moss::{download, util};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::process::Command;
@@ -29,7 +29,7 @@ pub async fn fetch(url: Url, file_path: &Path, pb: &ProgressBar) -> Result<Hash,
     );
     pb.set_message(format!("{} {url}", "Downloading".blue()));
 
-    let hash = request::download_with_progress_and_sha256(url.clone(), file_path, |progress| pb.inc(progress.delta))
+    let hash = download::to_path_with_progress_and_sha256(url.clone(), file_path, |progress| pb.inc(progress.delta))
         .await
         .map_err(Error::from)?
         .try_into()
@@ -256,9 +256,9 @@ pub enum Error {
     /// Two hashes did not match.
     #[error("hash mismatch for {name}, expected {expected:?} got {:?}", got.0)]
     HashMismatch { name: String, expected: String, got: Hash },
-    #[error("request")]
+    #[error("download")]
     /// A local or remote fetch failed.
-    Request(#[from] request::Error),
+    Download(#[from] download::Error),
     #[error("io")]
     /// A generic I/O error occurred.
     Io(#[from] io::Error),

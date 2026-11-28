@@ -15,7 +15,7 @@ use clap::Parser;
 use ent_core::{data::updates::get_latest_version, recipes::ParserRegistration};
 use fs_err::{self as fs};
 use itertools::Itertools;
-use moss::{request, runtime, util};
+use moss::{download, runtime, util};
 use similar::TextDiff;
 use stone_recipe::upstream::{self, SourceUri};
 use tempfile::NamedTempFile;
@@ -479,7 +479,7 @@ async fn fetch_and_cache_upstream(env: &Env, uri: Url, mpb: &MultiProgress) -> R
         .map_err(Error::CreateTempFile)?
         .into_temp_path();
 
-    let hash = request::download_with_progress_and_sha256(uri.clone(), &temp_file_path, |progress| {
+    let hash = download::to_path_with_progress_and_sha256(uri.clone(), &temp_file_path, |progress| {
         pb.inc(progress.delta);
     })
     .await?;
@@ -643,7 +643,7 @@ pub enum Error {
     #[error("move temp file")]
     MoveTempFile(#[source] io::Error),
     #[error("fetch upstream")]
-    Fetch(#[from] request::Error),
+    Fetch(#[from] download::Error),
     #[error("invalid utf-8 input")]
     Utf8(#[from] std::string::FromUtf8Error),
     #[error("draft")]

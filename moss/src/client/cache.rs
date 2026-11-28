@@ -16,7 +16,7 @@ use stone::{StoneDecodedPayload, StoneDigestWriter, StoneDigestWriterHasher, Sto
 use tracing::warn;
 use url::Url;
 
-use crate::{Installation, package, request, util};
+use crate::{Installation, download, package, util};
 
 /// Synchronized set of assets that are currently being
 /// unpacked. Used to prevent unpacking the same asset
@@ -127,7 +127,7 @@ pub async fn fetch(
         }
     }
 
-    let actual_hash = request::download_with_progress_and_sha256(url, &destination_path, |progress| {
+    let actual_hash = download::to_path_with_progress_and_sha256(url, &destination_path, |progress| {
         (on_progress)(Progress {
             delta: progress.delta,
             completed: progress.completed,
@@ -389,7 +389,7 @@ pub enum FetchError {
     #[snafu(display("invalid URL `{url}`"))]
     InvalidUrl { source: url::ParseError, url: Box<str> },
     #[snafu(transparent)]
-    Request { source: request::Error },
+    Download { source: download::Error },
     #[snafu(context(false), display("io"))]
     Io { source: io::Error },
     #[snafu(display("Binary stone hash mismatch for {package}: expected {expected}, got {actual}"))]

@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2023 aerynOS Developers
-// SPDX-FileCopyrightText: 2023 aerynOS Developers
 // SPDX-License-Identifier: MPL-2.0
 
 //! The core client implementation for the moss package manager
@@ -42,7 +41,7 @@ use crate::{
     registry::plugin::{self, Plugin},
     repository, runtime, signal,
     state::{self, Selection},
-    system_model::{self, LoadedSystemModel},
+    system_model::{self, Document, Recorded},
 };
 
 pub use self::extract::extract;
@@ -101,8 +100,8 @@ impl ClientBuilder {
     /// Build the [`Client`]
     pub fn build(mut self) -> Result<Client, Error> {
         if let Some(path) = self.system_model_path {
-            self.installation.system_model =
-                Some(system_model::load(&path)?.ok_or(Error::ImportSystemModelDoesntExist(path.to_owned()))?);
+            self.installation.declared_model =
+                Some(system_model::Declared::load(&path)?.ok_or(Error::ImportSystemModelDoesntExist(path.to_owned()))?);
         }
 
         let config = config::Manager::system(&self.installation.root, "moss");
@@ -111,9 +110,9 @@ impl ClientBuilder {
         let layout_db = db::layout::Database::new(self.installation.db_path("layout").to_str().unwrap_or_default())?;
 
         let repositories = if let Some(repos) = self.repositories {
-            repository::Manager::with_explicit(&self.client_name, repos, self.installation.clone())?
-        } else if let Some(system_model) = &self.installation.system_model {
-            repository::Manager::with_system_model(&self.client_name, system_model.clone(), self.installation.clone())?
+            repository::Manager::with_supplied(&self.client_name, repos, self.installation.clone())?
+        } else if let Some(declared) = &self.installation.declared_model {
+            repository::Manager::with_system_model(&self.client_name, declared.clone(), self.installation.clone())?
         } else {
             repository::Manager::with_config_manager(config.clone(), self.installation.clone())?
         };
@@ -230,7 +229,7 @@ impl Client {
     }
 
     /// Reload all configured repositories and refreshes their index file, then update
-    /// registry with all active repositories.
+    /// registry with all enabled repositories.
     pub async fn refresh_repositories(&mut self) -> Result<(), Error> {
         // Reload manager if config sourced to pickup config changes
         // then refresh indexes
@@ -268,7 +267,7 @@ impl Client {
         Ok(())
     }
 
-    /// Prune all cached data that isn't related to any states or active repositories.
+    /// Prune all cached data that isn't related to any states or enabled repositories.
     ///
     /// This will remove all downloaded stones & unpacked asset data for packages not
     /// in that set.
@@ -288,7 +287,7 @@ impl Client {
     }
 
     /// Resolves the provided id with the underlying registry, returning the first matching [`Package`]
-    pub fn resolve_package(&self, package: &package::Id) -> Result<Package, Error> {
+    pub fn package_by_id(&self, package: &package::Id) -> Result<Package, Error> {
         self.registry
             .by_id(package)
             .next()
@@ -299,7 +298,7 @@ impl Client {
     /// the first [`Package`] for each id.
     ///
     /// Packages are sorted by name and deduped before returning.
-    pub fn resolve_packages<'a>(
+    pub fn packages_by_id<'a>(
         &self,
         packages: impl IntoIterator<Item = &'a package::Id>,
     ) -> Result<Vec<Package>, Error> {
@@ -399,9 +398,9 @@ impl Client {
         );
 
         let explicit_packages =
-            self.resolve_packages(selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?;
-        let system_model = update_or_create_system_model(
-            self.installation.system_model.clone(),
+            self.packages_by_id(selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?;
+        let recorded = update_or_create_system_model(
+            self.installation.declared_model.as_ref(),
             &self.repositories,
             &explicit_packages,
         )?;
@@ -429,12 +428,12 @@ impl Client {
                 // Add to db
                 let state = self.state_db.add(selections, Some(&summary.to_string()), None)?;
 
-                self.apply_stateful_blit(fstree, &state, old_state, system_model)?;
+                self.apply_stateful_blit(fstree, &state, old_state, &recorded)?;
 
                 Ok(Some(state))
             }
             Scope::Ephemeral { blit_root } => {
-                self.apply_ephemeral_blit(fstree, blit_root, system_model)?;
+                self.apply_ephemeral_blit(fstree, blit_root, &recorded)?;
 
                 Ok(None)
             }
@@ -511,11 +510,11 @@ impl Client {
         fstree: vfs::Tree<fstree::PendingFile>,
         state: &State,
         old_state: Option<state::Id>,
-        system_model: SystemModel,
+        recorded: &Recorded,
     ) -> Result<(), Error> {
         record_state_id(&self.installation.staging_dir(), state.id)?;
         record_os_release(&self.installation.staging_dir())?;
-        record_system_model(&self.installation.staging_dir(), system_model)?;
+        recorded.write(&self.installation.staging_dir())?;
 
         create_root_links(&self.installation.isolation_dir())?;
 
@@ -551,10 +550,10 @@ impl Client {
         &self,
         fstree: vfs::Tree<fstree::PendingFile>,
         blit_root: &Path,
-        system_model: SystemModel,
+        recorded: &Recorded,
     ) -> Result<(), Error> {
         record_os_release(blit_root)?;
-        record_system_model(blit_root, system_model)?;
+        recorded.write(blit_root)?;
 
         create_root_links(blit_root)?;
         create_root_links(&self.installation.isolation_dir())?;
@@ -576,7 +575,7 @@ impl Client {
     /// host filesystem with the `/usr` tree within the transaction tree.
     ///
     /// This is performed using `renameat2` and results in instantly available, atomically updated
-    /// `/usr`. In combination with the mandated "`/usr`` merge" and statelessness approach of
+    /// `/usr`. In combination with the mandated "`/usr` merge" and statelessness approach of
     /// our project, it provides a unique atomic upgrade strategy.
     fn promote_staging(&self) -> Result<(), Error> {
         if self.scope.is_ephemeral() {
@@ -829,41 +828,41 @@ impl Client {
         Ok(fstree)
     }
 
-    fn load_or_create_system_model(&self, path: PathBuf, state: &State) -> Result<SystemModel, Error> {
-        match system_model::load(&path).map_err(Error::LoadSystemModel)? {
-            Some(system_model) => Ok(system_model.into()),
-            None => {
-                let active_repos = self
-                    .repositories
-                    .active()
-                    .map(|repo| (repo.id, repo.repository))
-                    .collect::<repository::Map>();
-
-                let packages = self
-                    .resolve_packages(state.selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?
-                    .into_iter()
-                    .map(|package| Provider::package_name(package.meta.name.as_str()))
-                    .collect();
-
-                Ok(system_model::create(active_repos, packages))
-            }
+    /// The recorded model of `state`, i.e. for `state export`.
+    ///
+    /// State from before models were recorded don't have one, so it's synthesized from the
+    /// state's explicit selections and the enabled repositories.
+    pub fn recorded_model(&self, state: &State) -> Result<Recorded, Error> {
+        if let Some(recorded) = Recorded::load(&self.installation.state_root(state.id))? {
+            return Ok(recorded);
         }
+
+        // synthesis is necessary, because this state doesn't have a recorded model
+        let repositories = self
+            .repositories
+            .enabled()
+            .map(|repo| (repo.id, repo.repository))
+            .collect::<repository::Map>();
+
+        let explicit = self
+            .packages_by_id(state.selections.iter().filter_map(|s| s.explicit.then_some(&s.package)))?
+            .into_iter()
+            .map(|package| Provider::package_name(package.meta.name.as_str()))
+            .collect();
+
+        Ok(Document::new(SystemModel {
+            disable_warning: false,
+            repositories,
+            explicit,
+        })
+        .into())
     }
 
-    /// Export the provided state as a [`SystemModel`]
-    pub fn export_state(&self, state: state::Id) -> Result<SystemModel, Error> {
+    /// Export system model recorded with the provided state
+    pub fn export_state(&self, state: state::Id) -> Result<Recorded, Error> {
         let state = self.state_db.get(state)?;
-        let is_active = self.installation.active_state == Some(state.id);
 
-        let path = if is_active {
-            self.installation.root.join("usr/lib/system-model.kdl")
-        } else {
-            self.installation
-                .root_path(state.id.to_string())
-                .join("usr/lib/system-model.kdl")
-        };
-
-        self.load_or_create_system_model(path, &state)
+        self.recorded_model(&state)
     }
 
     /// Print boot status to stdout
@@ -1027,43 +1026,61 @@ fn record_os_release(root: &Path) -> Result<(), Error> {
 }
 
 fn update_or_create_system_model(
-    current: Option<LoadedSystemModel>,
+    declared: Option<&system_model::Declared>,
     repositories: &repository::Manager,
     packages: &[Package],
-) -> Result<SystemModel, Error> {
-    let active_repos = repositories
-        .active()
-        .map(|repo| (repo.id, repo.repository))
-        .collect::<repository::Map>();
+) -> Result<Recorded, Error> {
+    match declared {
+        // Update existing with kept and added packages
+        Some(declared) => {
+            let model = declared.model();
 
-    match current {
-        // Update existing w/ incoming packages
-        Some(existing) => SystemModel::from(existing)
-            .sync_packages(packages)
-            .map_err(Error::UpdateSystemModel),
+            // Providers of the model still provided by a package, then the names of
+            // packages the model doesn't provide for yet
+            let kept = model
+                .explicit
+                .iter()
+                .filter(|provider| packages.iter().any(|package| package.meta.providers.contains(provider)))
+                .cloned();
+            let added = packages
+                .iter()
+                .filter(|package| {
+                    !package
+                        .meta
+                        .providers
+                        .iter()
+                        .any(|provider| model.explicit.contains(provider))
+                })
+                .map(|package| Provider::package_name(package.meta.name.as_str()));
+            let explicit = kept.chain(added).collect::<Vec<_>>();
+
+            Ok(declared
+                .document()
+                .clone()
+                .with_explicit(&explicit)
+                .map_err(Error::UpdateSystemModel)?
+                .into())
+        }
 
         // Generate a fresh system-model file
         None => {
-            let packages = packages
+            let repositories = repositories
+                .enabled()
+                .map(|repo| (repo.id, repo.repository))
+                .collect::<repository::Map>();
+            let explicit = packages
                 .iter()
                 .map(|package| Provider::package_name(package.meta.name.as_str()))
                 .collect();
 
-            Ok(system_model::create(active_repos, packages))
+            Ok(Document::new(SystemModel {
+                disable_warning: false,
+                repositories,
+                explicit,
+            })
+            .into())
         }
     }
-}
-
-fn record_system_model(root: &Path, system_model: SystemModel) -> Result<(), Error> {
-    let dir = root.join("usr").join("lib");
-
-    if !dir.exists() {
-        fs::create_dir(&dir)?;
-    }
-
-    fs::write(dir.join("system-model.kdl"), system_model.encoded())?;
-
-    Ok(())
 }
 
 #[derive(Clone, Debug)]
@@ -1102,7 +1119,7 @@ fn build_registry(
     registry.add_plugin(Plugin::Cobble(plugin::Cobble::default()));
     registry.add_plugin(Plugin::Active(plugin::Active::new(state, installdb.clone())));
 
-    for repo in repositories.active() {
+    for repo in repositories.enabled() {
         registry.add_plugin(Plugin::Repository(plugin::Repository::new(repo)));
     }
 

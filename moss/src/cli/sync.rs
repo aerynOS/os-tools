@@ -17,17 +17,21 @@ use crate::cli::{Confirmation, Global};
     about = "Sync package selections with candidates from the highest priority repository"
 )]
 pub struct Command {
-    /// Whether to update repositories before syncing.
-    #[arg(short, long, help = "Update repositories before syncing")]
-    update: bool,
+    /// Whether to refresh enabled repository indices before syncing.
+    #[arg(
+        short = 'r',
+        long = "refresh",
+        help = "Refresh enabled repository indices before syncing"
+    )]
+    refresh: bool,
 
-    /// Path where to blit the sync to. When None, it is assumed to be the root.
+    /// Path where to blit the sync to. When None, it is assumed to be the current root's /.moss Installation.
     #[arg(
         value_name = "dir",
         long = "to",
         help = concat!(
             "Blit the sync to the provided directory instead of the root. ",
-            "This operation won't be captured as a new state"
+            "This operation will result in a detached fstree that will not be captured as a new state."
         )
     )]
     blit_target: Option<PathBuf>,
@@ -66,8 +70,8 @@ impl Command {
 
         let mut client = client_builder.build()?;
 
-        // Update repos if requested
-        if self.update {
+        // Refresh enabled repository indices if requested
+        if self.refresh {
             runtime::block_on(client.refresh_repositories())?;
         }
 

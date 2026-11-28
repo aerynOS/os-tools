@@ -15,11 +15,7 @@ use tui::{
 };
 
 use crate::{
-    Client, Package, Provider, client, db, package,
-    registry::transaction,
-    runtime,
-    state::Selection,
-    system_model::{self, LoadedSystemModel},
+    Client, Package, Provider, client, db, package, registry::transaction, runtime, state::Selection, system_model,
 };
 
 pub fn sync(client: &Client, yes: bool, simulate: bool) -> Result<Timing, Error> {
@@ -27,7 +23,7 @@ pub fn sync(client: &Client, yes: bool, simulate: bool) -> Result<Timing, Error>
     let mut instant = Instant::now();
 
     // Grab the system model from the installation
-    let system_model = client.installation.system_model.clone();
+    let system_model = client.installation.declared_model.clone();
 
     // Grab all the existing installed packages
     let installed = client.registry.list_installed().collect::<Vec<_>>();
@@ -155,7 +151,12 @@ pub fn sync(client: &Client, yes: bool, simulate: bool) -> Result<Timing, Error>
         finalized
             .iter()
             .map(|p| {
-                let is_explicit = system_model.packages.intersection(&p.meta.providers).next().is_some();
+                let is_explicit = system_model
+                    .model()
+                    .explicit
+                    .intersection(&p.meta.providers)
+                    .next()
+                    .is_some();
 
                 Selection {
                     package: p.id.clone(),
@@ -252,7 +253,7 @@ fn resolve_with_installed(client: &Client, packages: &[Package]) -> Result<Vec<P
     tx.add(with_sync)?;
 
     // Resolve the tx
-    Ok(client.resolve_packages(tx.finalize())?)
+    Ok(client.packages_by_id(tx.finalize())?)
 }
 
 /// Returns the resolved package set based on the packages defined in the system model
@@ -260,10 +261,11 @@ fn resolve_with_installed(client: &Client, packages: &[Package]) -> Result<Vec<P
 /// System model is the source of truth here vs "implicit" mode which relies on the active
 /// state + configured repos as the source of truth
 #[tracing::instrument(skip_all)]
-fn resolve_with_system_model(client: &Client, system_model: &LoadedSystemModel) -> Result<Vec<Package>, Error> {
+fn resolve_with_system_model(client: &Client, system_model: &system_model::Declared) -> Result<Vec<Package>, Error> {
     // Lookup the available package for each
     let packages = system_model
-        .packages
+        .model()
+        .explicit
         .iter()
         .map(|provider| {
             client
@@ -279,7 +281,7 @@ fn resolve_with_system_model(client: &Client, system_model: &LoadedSystemModel) 
     tx.add(packages)?;
 
     // Resolve the tx
-    Ok(client.resolve_packages(tx.finalize())?)
+    Ok(client.packages_by_id(tx.finalize())?)
 }
 
 /// Simple timing information for Sync

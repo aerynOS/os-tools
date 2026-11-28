@@ -70,7 +70,7 @@ pub fn self_upgrade(client: &mut Client, simulate: bool) -> Result<(), Error> {
                 description: "...".to_owned(),
                 source: repository::Source::DirectIndex(uri.clone()),
                 priority: 0.into(),
-                active: true,
+                enabled: true,
             },
         )]))
         .build()?;

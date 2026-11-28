@@ -22,8 +22,7 @@ use crate::{
     db::meta,
     environment, package,
     repository::{self, Format, OutdatedRepoIndexUri, Repository, format},
-    runtime,
-    system_model::LoadedSystemModel,
+    runtime, system_model,
 };
 
 #[derive(Debug)]
@@ -31,9 +30,9 @@ pub enum Source {
     ConfigManager(config::Manager),
     SystemModel {
         identifier: String,
-        system_model: LoadedSystemModel,
+        system_model: system_model::Declared,
     },
-    Explicit {
+    Supplied {
         identifier: String,
         repos: repository::Map,
     },
@@ -44,7 +43,7 @@ impl Source {
         match self {
             Source::ConfigManager(_) => environment::NAME,
             Source::SystemModel { identifier, .. } => identifier,
-            Source::Explicit { identifier, .. } => identifier,
+            Source::Supplied { identifier, .. } => identifier,
         }
     }
 }
@@ -73,7 +72,7 @@ impl Manager {
     /// [`Manager`] can't be used to `add` new repos in this mode
     pub fn with_system_model(
         identifier: impl ToString,
-        system_model: LoadedSystemModel,
+        system_model: system_model::Declared,
         installation: Installation,
     ) -> Result<Self, Error> {
         Self::new(
@@ -88,13 +87,13 @@ impl Manager {
     /// Create a [`Manager`] for the supplied [`Installation`] using the provided configurations
     ///
     /// [`Manager`] can't be used to `add` new repos in this mode
-    pub fn with_explicit(
+    pub fn with_supplied(
         identifier: impl ToString,
         repos: repository::Map,
         installation: Installation,
     ) -> Result<Self, Error> {
         Self::new(
-            Source::Explicit {
+            Source::Supplied {
                 identifier: identifier.to_string(),
                 repos,
             },
@@ -113,8 +112,8 @@ impl Manager {
                     .map(|loaded| (Some(loaded.path), loaded.value))
                     .collect()
             }
-            Source::SystemModel { system_model, .. } => vec![(None, system_model.repositories.clone())],
-            Source::Explicit { repos, .. } => vec![(None, repos.clone())],
+            Source::SystemModel { system_model, .. } => vec![(None, system_model.model().repositories.clone())],
+            Source::Supplied { repos, .. } => vec![(None, repos.clone())],
         };
 
         // Open all repo meta dbs and collect into hash map
@@ -152,7 +151,7 @@ impl Manager {
     /// Add a [`Repository`]
     pub fn add_repository(&mut self, id: repository::Id, repository: Repository) -> Result<(), Error> {
         let Source::ConfigManager(config) = &*self.source else {
-            return Err(Error::ExplicitUnsupported);
+            return Err(Error::ReadOnlySource);
         };
 
         // Save repo as new config file
@@ -184,7 +183,7 @@ impl Manager {
             return Err(Error::UnknownRepo(id.clone()));
         };
 
-        if repo.repository.active {
+        if repo.repository.enabled {
             let file = fetch_index(&self.source, &repo, &self.installation).await?;
             runtime::unblock(move || update_meta_db(&repo, &file)).await?;
         }
@@ -199,7 +198,7 @@ impl Manager {
 
         // Fetch index files asynchronously and then
         // update to DB
-        stream::iter(self.repositories.iter().filter(|(_, r)| r.repository.active))
+        stream::iter(self.repositories.iter().filter(|(_, r)| r.repository.enabled))
             .map(|(id, _)| async {
                 let pb = mpb.add(
                     ProgressBar::new_spinner()
@@ -245,7 +244,7 @@ impl Manager {
         let uninitialized = self
             .repositories
             .iter()
-            .filter(|(_, r)| r.repository.active)
+            .filter(|(_, r)| r.repository.enabled)
             .filter_map(|(id, state)| {
                 let index_file =
                     cache_dir(self.source.identifier(), &state.repository, &self.installation).join("stone.index");
@@ -301,16 +300,16 @@ impl Manager {
         Ok(uninitialized.len())
     }
 
-    /// Returns the active repositories held by this manager
-    pub(crate) fn active(&self) -> impl Iterator<Item = repository::Cached> + '_ {
-        self.repositories.values().filter(|c| c.repository.active).cloned()
+    /// Returns the enabled repositories held by this manager
+    pub(crate) fn enabled(&self) -> impl Iterator<Item = repository::Cached> + '_ {
+        self.repositories.values().filter(|c| c.repository.enabled).cloned()
     }
 
     /// Remove a repository, deleting any related config & cached data
     pub fn remove(&mut self, id: impl Into<repository::Id>) -> Result<Removal, Error> {
         // Only allow removal for system repo manager
         let Source::ConfigManager(config) = &*self.source else {
-            return Err(Error::ExplicitUnsupported);
+            return Err(Error::ReadOnlySource);
         };
 
         // Remove from memory
@@ -339,19 +338,19 @@ impl Manager {
         self.repositories.iter().map(|(id, state)| (id, &state.repository))
     }
 
-    /// Sets the repo as active or not
-    async fn set_active(&mut self, id: &repository::Id, active: bool) -> Result<(), Error> {
+    /// Sets the repo as enabled or not
+    async fn set_enabled(&mut self, id: &repository::Id, enabled: bool) -> Result<(), Error> {
         // Only allow disable for system repo manager
         let Source::ConfigManager(config) = &*self.source else {
-            return Err(Error::ExplicitUnsupported);
+            return Err(Error::ReadOnlySource);
         };
 
         let Some(cached) = self.repositories.get_mut(id) else {
             return Err(Error::UnknownRepo(id.clone()));
         };
 
-        if active != cached.repository.active {
-            cached.repository.active = active;
+        if enabled != cached.repository.enabled {
+            cached.repository.enabled = enabled;
 
             let map = repository::Map::with([(id.clone(), cached.repository.clone())]);
             config.save(id, &map).map_err(Error::SaveConfig)?;
@@ -362,12 +361,12 @@ impl Manager {
 
     /// Enable the repo
     pub async fn enable(&mut self, id: &repository::Id) -> Result<(), Error> {
-        self.set_active(id, true).await
+        self.set_enabled(id, true).await
     }
 
     /// Disable the repo
     pub async fn disable(&mut self, id: &repository::Id) -> Result<(), Error> {
-        self.set_active(id, false).await
+        self.set_enabled(id, false).await
     }
 }
 
@@ -547,8 +546,8 @@ async fn resolve_index_from_root(
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Can't modify repos when using explicit configs or system-model.kdl")]
-    ExplicitUnsupported,
+    #[error("Can't modify repos when they are supplied directly or by system-model.kdl")]
+    ReadOnlySource,
     #[error("Missing metadata field: {0:?}")]
     MissingMetaField(StonePayloadMetaTag),
     #[error("create directory")]

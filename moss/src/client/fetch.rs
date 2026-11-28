@@ -17,9 +17,9 @@ use tui::{
 use url::{ParseError, Url};
 
 use crate::{
-    Client, Package, Provider, client, environment,
+    Client, Package, Provider, client, download, environment,
     package::{self, Flags, Meta},
-    request, runtime, util,
+    runtime, util,
 };
 
 /// Fetch a set of packages.
@@ -102,7 +102,7 @@ pub fn fetch(client: &mut Client, pkgs: &[&str], output_dir: &Path, verbose: boo
 
             let dest_path = output_dir.join(file_name);
 
-            request::download_with_progress(uri, &dest_path, |progress| {
+            download::to_path_with_progress(uri, &dest_path, |progress| {
                 progress_bar.inc(progress.delta);
                 info!(
                     progress = progress.completed as f32 / download_size as f32,
@@ -218,7 +218,7 @@ pub enum Error {
     NoFileNameInUri(String),
 
     #[error("fetch package {1}")]
-    FetchPackage(#[source] request::Error, package::Name),
+    FetchPackage(#[source] download::Error, package::Name),
 }
 
 /// Simple timing information for Fetch

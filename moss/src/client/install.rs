@@ -40,7 +40,7 @@ pub fn install(client: &mut Client, pkgs: &[&str], yes: bool, simulate: bool) ->
     tx.add(input.clone())?;
 
     // Resolve transaction to metadata
-    let resolved = client.resolve_packages(tx.finalize())?;
+    let resolved = client.packages_by_id(tx.finalize())?;
 
     // Get installed packages to check against
     let installed = client.registry.list_installed().collect::<Vec<_>>();

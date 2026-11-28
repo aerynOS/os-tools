@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use crate::{Provider, Repository, SystemModel, dependency, repository};
 
+/// Attempt to decode a KDL document into a [`SystemModel`]
 pub fn decode(content: &str) -> Result<SystemModel, Error> {
     let document: KdlDocument = content.parse().map_err(Error::ParseKdlDocument)?;
 
@@ -18,7 +19,8 @@ pub fn decode(content: &str) -> Result<SystemModel, Error> {
         })
         .transpose()?;
 
-    let packages = document
+    let explicit = document
+        // TODO: Alias "packages" to "providers"
         .get("packages")
         .map(|node| node.iter_children().map(decode_package).collect::<Result<_, _>>())
         .transpose()?
@@ -33,8 +35,7 @@ pub fn decode(content: &str) -> Result<SystemModel, Error> {
     Ok(SystemModel {
         disable_warning: disable_warning.unwrap_or_default(),
         repositories,
-        packages,
-        encoded: content.to_owned(),
+        explicit,
     })
 }
 
@@ -42,6 +43,7 @@ pub(super) fn decode_package(node: &KdlNode) -> Result<Provider, Error> {
     Provider::from_name(node.name().value()).map_err(Error::ParseProvider)
 }
 
+// TODO: This needs to link to DirectIndex and RootIndex repository definitions/documentation
 pub(super) fn decode_repository(node: &KdlNode) -> Result<(repository::Id, Repository), Error> {
     let name = node.name().value();
     let id = repository::Id::new(name);
@@ -178,7 +180,7 @@ pub(super) fn decode_repository(node: &KdlNode) -> Result<(repository::Id, Repos
             description: description.to_owned(),
             source,
             priority,
-            active: enabled,
+            enabled,
         },
     ))
 }
